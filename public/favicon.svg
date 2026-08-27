@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="14" fill="#ea580c"/>
+  <circle cx="32" cy="26" r="12" fill="#fff7ed"/>
+  <path d="M20 26a12 12 0 0 1 24 0c0 8-6 14-6 20h-4c0-6-6-8-6-14" fill="none"/>
+  <text x="32" y="34" text-anchor="middle" font-size="26" font-family="'Segoe UI', Arial, sans-serif" fill="#ea580c" font-weight="700">₹</text>
+  <path d="M14 46c6-4 30-4 36 0" stroke="#fff7ed" stroke-width="4" stroke-linecap="round" fill="none"/>
+</svg>

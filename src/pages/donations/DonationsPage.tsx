@@ -1,0 +1,354 @@
+import { useMemo, useRef, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { useYearContext } from '@/context/YearContext'
+import { useCategories, useDonations, useUnits } from '@/hooks/useYearData'
+import { usePagination } from '@/hooks/usePagination'
+import { useToast } from '@/context/ToastContext'
+import { useWhatsAppShare } from '@/hooks/useWhatsAppShare'
+import { DataTable, type DataTableColumn } from '@/components/common/DataTable'
+import { EmptyState } from '@/components/common/EmptyState'
+import { FilterBar, SearchInput, SelectFilter, DateRangeFilter } from '@/components/common/Filters'
+import { Pagination } from '@/components/common/Pagination'
+import { ConfirmDialog } from '@/components/common/ConfirmDialog'
+import { FieldDiffList } from '@/components/common/FieldDiffList'
+import { SummaryList } from '@/components/common/SummaryList'
+import { ExportButtons } from '@/components/common/ExportButtons'
+import { DonationForm, defaultDonationFormValues, donationToFormValues } from './DonationForm'
+import { insertDonation, updateDonation, deleteDonation } from '@/db/repositories/donations'
+import { formatCurrency, formatNumber } from '@/lib/currency'
+import { formatDisplayDate, isDateInRange } from '@/lib/date'
+import { matchesSearch } from '@/lib/tableUtils'
+import { diffFields } from '@/lib/diff'
+import { buildPdfReport, pdfFileName } from '@/lib/export/pdf'
+import { buildDonationsTable } from '@/lib/export/reportBuilders'
+import { exportElementAsPng, pngFileName } from '@/lib/export/png'
+import type { DonationInput } from '@/lib/validation'
+import type { Donation } from '@/types'
+
+type ModalState = { mode: 'closed' } | { mode: 'add' } | { mode: 'edit'; donation: Donation }
+
+export function DonationsPage() {
+  const { currentYearId, currentYear } = useYearContext()
+  const reportRef = useRef<HTMLDivElement>(null)
+  const donations = useDonations(currentYearId)
+  const categories = useCategories('donation')
+  const units = useUnits()
+  const { showToast } = useToast()
+  const { shareDonation } = useWhatsAppShare()
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  const [modal, setModal] = useState<ModalState>(searchParams.get('add') ? { mode: 'add' } : { mode: 'closed' })
+  const [pendingEdit, setPendingEdit] = useState<{ donation: Donation; input: DonationInput } | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Donation | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const [search, setSearch] = useState('')
+  const [typeFilter, setTypeFilter] = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
+
+  const categoryName = (id: string) => categories?.find((c) => c.id === id)?.name ?? 'Uncategorized'
+  const unitName = (id?: string) => units?.find((u) => u.id === id)?.name ?? ''
+
+  const filtered = useMemo(() => {
+    if (!donations) return []
+    return donations
+      .filter((d) => (typeFilter ? d.type === typeFilter : true))
+      .filter((d) => (categoryFilter ? d.categoryId === categoryFilter : true))
+      .filter((d) => isDateInRange(d.date, dateFrom || undefined, dateTo || undefined))
+      .filter((d) => matchesSearch([d.donorName, d.commodityName, d.notes, categoryName(d.categoryId)], search))
+      .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [donations, typeFilter, categoryFilter, dateFrom, dateTo, search, categories])
+
+  const { pageItems, page, totalPages, hasNext, hasPrev, next, prev } = usePagination(filtered, 25)
+
+  if (!currentYearId || donations === undefined || categories === undefined || units === undefined) {
+    return <p className="page-loading">Loading donations…</p>
+  }
+
+  async function handleAdd(input: DonationInput) {
+    await insertDonation(currentYearId!, input)
+    setModal({ mode: 'closed' })
+    searchParams.delete('add')
+    setSearchParams(searchParams, { replace: true })
+    showToast('Donation added successfully', 'success', {
+      label: 'Copy WhatsApp message',
+      onClick: () => shareDonation(input),
+    })
+  }
+
+  function handleEditSubmit(original: Donation, input: DonationInput) {
+    const changes = diffFields([
+      ['Donor Name', original.donorName, input.donorName],
+      ['Type', original.type, input.type],
+      ['Amount', formatCurrency(original.amount), formatCurrency(input.amount)],
+      ['Commodity', original.commodityName ?? '', input.commodityName ?? ''],
+      ['Quantity', formatNumber(original.quantity), formatNumber(input.quantity)],
+      ['Unit', unitName(original.unitId), unitName(input.unitId)],
+      ['Category', categoryName(original.categoryId), categoryName(input.categoryId)],
+      ['Date', formatDisplayDate(original.date), formatDisplayDate(input.date)],
+      ['Notes', original.notes ?? '', input.notes ?? ''],
+    ])
+    if (changes.length === 0) {
+      setModal({ mode: 'closed' })
+      return
+    }
+    setPendingEdit({ donation: original, input })
+  }
+
+  async function confirmEdit() {
+    if (!pendingEdit) return
+    setBusy(true)
+    try {
+      await updateDonation(pendingEdit.donation.id, pendingEdit.input)
+      setPendingEdit(null)
+      setModal({ mode: 'closed' })
+      showToast('Donation updated successfully')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return
+    setBusy(true)
+    try {
+      await deleteDonation(deleteTarget.id)
+      setDeleteTarget(null)
+      showToast('Donation deleted', 'info')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleExportPdf() {
+    if (!currentYear) return
+    try {
+      const doc = await buildPdfReport({
+        yearName: currentYear.name,
+        reportTitle: 'Donations Report',
+        orientation: 'landscape',
+        table: buildDonationsTable(filtered, categories!, units!),
+      })
+      doc.save(pdfFileName(currentYear.name, 'Donations Report'))
+    } catch {
+      showToast('Could not generate PDF. Please try again.', 'error')
+    }
+  }
+
+  async function handleExportPng() {
+    if (!currentYear || !reportRef.current) return
+    try {
+      await exportElementAsPng(reportRef.current, pngFileName(currentYear.name, 'Donations Report'))
+    } catch {
+      showToast('Could not generate image. Please try again.', 'error')
+    }
+  }
+
+  const columns: Array<DataTableColumn<Donation>> = [
+    { key: 'date', header: 'Date', render: (d) => formatDisplayDate(d.date) },
+    { key: 'donor', header: 'Donor', render: (d) => d.donorName },
+    { key: 'type', header: 'Type', render: (d) => (d.type === 'monetary' ? 'Monetary' : 'Commodity') },
+    {
+      key: 'amount',
+      header: 'Amount / Commodity',
+      align: 'right',
+      render: (d) => (d.type === 'monetary' ? formatCurrency(d.amount) : d.commodityName ?? '—'),
+    },
+    {
+      key: 'quantity',
+      header: 'Qty',
+      align: 'right',
+      render: (d) => (d.type === 'commodity' ? `${formatNumber(d.quantity)} ${unitName(d.unitId)}` : '—'),
+    },
+    { key: 'category', header: 'Category', render: (d) => categoryName(d.categoryId) },
+    { key: 'notes', header: 'Notes', render: (d) => d.notes ?? '—' },
+    {
+      key: 'actions',
+      header: 'Actions',
+      render: (d) => (
+        <div className="row-actions">
+          <button type="button" className="link-button" onClick={() => setModal({ mode: 'edit', donation: d })}>
+            Edit
+          </button>
+          <button type="button" className="link-button link-button--danger" onClick={() => setDeleteTarget(d)}>
+            Delete
+          </button>
+          <button type="button" className="link-button" onClick={() => shareDonation(d)}>
+            Copy WhatsApp
+          </button>
+        </div>
+      ),
+    },
+  ]
+
+  return (
+    <div className="page">
+      <div className="page__header">
+        <div>
+          <h1>Donations</h1>
+          <p className="page__subtitle">
+            <Link to="/donations">Actual Donations</Link> · <Link to="/donations/expected">Expected Donations</Link>
+          </p>
+        </div>
+        <button type="button" className="button button--primary" onClick={() => setModal({ mode: 'add' })}>
+          + Add Donation
+        </button>
+      </div>
+
+      {donations.length === 0 ? (
+        <EmptyState
+          title="No donations yet"
+          description="Add your first donation to start tracking Ganesh Navarathri contributions."
+          action={
+            <button type="button" className="button button--primary" onClick={() => setModal({ mode: 'add' })}>
+              + Add Donation
+            </button>
+          }
+        />
+      ) : (
+        <>
+          <FilterBar>
+            <SearchInput value={search} onChange={setSearch} placeholder="Search donor, commodity, notes…" />
+            <SelectFilter
+              label="Type"
+              value={typeFilter}
+              onChange={setTypeFilter}
+              options={[
+                { value: 'monetary', label: 'Monetary' },
+                { value: 'commodity', label: 'Commodity' },
+              ]}
+            />
+            <SelectFilter
+              label="Category"
+              value={categoryFilter}
+              onChange={setCategoryFilter}
+              options={categories.map((c) => ({ value: c.id, label: c.name }))}
+            />
+            <DateRangeFilter from={dateFrom} to={dateTo} onFromChange={setDateFrom} onToChange={setDateTo} />
+          </FilterBar>
+
+          <ExportButtons onExportPdf={handleExportPdf} onExportPng={handleExportPng} />
+
+          {filtered.length === 0 ? (
+            <EmptyState title="No matching donations" description="Try adjusting your search or filters." />
+          ) : (
+            <div ref={reportRef}>
+              <DataTable
+                columns={columns}
+                data={pageItems}
+                rowKey={(d) => d.id}
+                renderCard={(d) => (
+                  <>
+                    <div className="record-card__top">
+                      <strong>{d.donorName}</strong>
+                      <span className="badge">{d.type === 'monetary' ? 'Monetary' : 'Commodity'}</span>
+                    </div>
+                    <div className="record-card__amount">
+                      {d.type === 'monetary' ? formatCurrency(d.amount) : `${d.commodityName} — ${formatNumber(d.quantity)} ${unitName(d.unitId)}`}
+                    </div>
+                    <div className="record-card__meta">
+                      {formatDisplayDate(d.date)} · {categoryName(d.categoryId)}
+                    </div>
+                    {d.notes && <div className="record-card__notes">{d.notes}</div>}
+                    <div className="row-actions">
+                      <button type="button" className="link-button" onClick={() => setModal({ mode: 'edit', donation: d })}>
+                        Edit
+                      </button>
+                      <button type="button" className="link-button link-button--danger" onClick={() => setDeleteTarget(d)}>
+                        Delete
+                      </button>
+                      <button type="button" className="link-button" onClick={() => shareDonation(d)}>
+                        Copy WhatsApp
+                      </button>
+                    </div>
+                  </>
+                )}
+              />
+              <Pagination page={page} totalPages={totalPages} hasNext={hasNext} hasPrev={hasPrev} onNext={next} onPrev={prev} />
+            </div>
+          )}
+        </>
+      )}
+
+      {modal.mode === 'add' && (
+        <DonationForm
+          title="Add Donation"
+          submitLabel="Save Donation"
+          initialValues={defaultDonationFormValues(categories, units)}
+          categories={categories}
+          units={units}
+          onSubmit={handleAdd}
+          onClose={() => {
+            setModal({ mode: 'closed' })
+            searchParams.delete('add')
+            setSearchParams(searchParams, { replace: true })
+          }}
+        />
+      )}
+
+      {modal.mode === 'edit' && (
+        <DonationForm
+          title="Edit Donation"
+          submitLabel="Save Changes"
+          initialValues={donationToFormValues(modal.donation)}
+          categories={categories}
+          units={units}
+          onSubmit={(input) => handleEditSubmit(modal.donation, input)}
+          onClose={() => setModal({ mode: 'closed' })}
+        />
+      )}
+
+      {pendingEdit && (
+        <ConfirmDialog
+          title="Confirm Changes"
+          summary={
+            <FieldDiffList
+              changes={diffFields([
+                ['Donor Name', pendingEdit.donation.donorName, pendingEdit.input.donorName],
+                ['Amount', formatCurrency(pendingEdit.donation.amount), formatCurrency(pendingEdit.input.amount)],
+                ['Category', categoryName(pendingEdit.donation.categoryId), categoryName(pendingEdit.input.categoryId)],
+                ['Date', formatDisplayDate(pendingEdit.donation.date), formatDisplayDate(pendingEdit.input.date)],
+              ])}
+            />
+          }
+          confirmLabel="Save Changes"
+          onConfirm={confirmEdit}
+          onCancel={() => setPendingEdit(null)}
+          busy={busy}
+        />
+      )}
+
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Delete Donation?"
+          description="This record will be permanently deleted."
+          summary={
+            <SummaryList
+              rows={[
+                { label: 'Donor', value: deleteTarget.donorName },
+                { label: 'Type', value: deleteTarget.type === 'monetary' ? 'Monetary' : 'Commodity' },
+                {
+                  label: deleteTarget.type === 'monetary' ? 'Amount' : 'Commodity',
+                  value:
+                    deleteTarget.type === 'monetary'
+                      ? formatCurrency(deleteTarget.amount)
+                      : `${deleteTarget.commodityName} (${formatNumber(deleteTarget.quantity)} ${unitName(deleteTarget.unitId)})`,
+                },
+                { label: 'Category', value: categoryName(deleteTarget.categoryId) },
+                { label: 'Date', value: formatDisplayDate(deleteTarget.date) },
+              ]}
+            />
+          }
+          confirmLabel="Delete"
+          danger
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+          busy={busy}
+        />
+      )}
+    </div>
+  )
+}

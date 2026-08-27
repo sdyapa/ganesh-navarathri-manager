@@ -1,0 +1,89 @@
+import { APP_VERSION } from '@/appVersion'
+import { BACKUP_SCHEMA_VERSION, APP_NAME } from '@/types'
+import type { BackupFile, YearProfileBundle } from '@/types'
+import { listDonationsForYear } from '@/db/repositories/donations'
+import { listExpectedDonationsForYear } from '@/db/repositories/expectedDonations'
+import { listExpensesForYear } from '@/db/repositories/expenses'
+import { listExpectedExpensesForYear } from '@/db/repositories/expectedExpenses'
+import { listAuctionsForYear } from '@/db/repositories/auctions'
+import { getYearProfile, listYearProfiles } from '@/db/repositories/yearProfiles'
+import { listCategories } from '@/db/repositories/categories'
+import { listUnits } from '@/db/repositories/units'
+import { getAppSettings } from '@/db/repositories/settings'
+import { nowIso } from '@/lib/date'
+
+async function buildYearBundle(yearProfileId: string): Promise<YearProfileBundle> {
+  const profile = await getYearProfile(yearProfileId)
+  if (!profile) throw new Error('Year profile not found')
+  const [donations, expectedDonations, expenses, expectedExpenses, auctions] = await Promise.all([
+    listDonationsForYear(yearProfileId),
+    listExpectedDonationsForYear(yearProfileId),
+    listExpensesForYear(yearProfileId),
+    listExpectedExpensesForYear(yearProfileId),
+    listAuctionsForYear(yearProfileId),
+  ])
+  return { profile, donations, expectedDonations, expenses, expectedExpenses, auctions }
+}
+
+async function buildSettingsBlock() {
+  const [categories, units, appSettings] = await Promise.all([
+    listCategories(),
+    listUnits(),
+    getAppSettings(),
+  ])
+  return {
+    categories,
+    units,
+    appSettings: { whatsappTemplates: appSettings.whatsappTemplates, updatedAt: appSettings.updatedAt },
+  }
+}
+
+export async function exportYearBackup(yearProfileId: string): Promise<BackupFile> {
+  const bundle = await buildYearBundle(yearProfileId)
+  return {
+    appName: APP_NAME,
+    appVersion: APP_VERSION,
+    backupVersion: BACKUP_SCHEMA_VERSION,
+    exportType: 'single-year',
+    exportedAt: nowIso(),
+    years: [bundle],
+    settings: await buildSettingsBlock(),
+  }
+}
+
+export async function exportFullBackup(): Promise<BackupFile> {
+  const profiles = await listYearProfiles()
+  const years = await Promise.all(profiles.map((p) => buildYearBundle(p.id)))
+  return {
+    appName: APP_NAME,
+    appVersion: APP_VERSION,
+    backupVersion: BACKUP_SCHEMA_VERSION,
+    exportType: 'full',
+    exportedAt: nowIso(),
+    years,
+    settings: await buildSettingsBlock(),
+  }
+}
+
+export function backupFileName(backup: BackupFile): string {
+  const stamp = backup.exportedAt.slice(0, 10)
+  if (backup.exportType === 'single-year' && backup.years.length === 1) {
+    return `ganesh-navarathri-${backup.years[0].profile.year}-backup-${stamp}.json`
+  }
+  return `ganesh-navarathri-full-backup-${stamp}.json`
+}
+
+export function downloadJsonFile(data: unknown, filename: string): void {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  try {
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = filename
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
