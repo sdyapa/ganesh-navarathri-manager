@@ -1,5 +1,6 @@
 import { db } from '@/db/db'
 import { generateId } from '@/lib/id'
+import { DEFAULT_DONATION_CATEGORY_NAMES, DEFAULT_EXPENSE_CATEGORY_NAMES } from '@/db/defaults'
 import type { Category } from '@/types'
 
 export async function listCategories(kind?: Category['kind']): Promise<Category[]> {
@@ -52,4 +53,36 @@ export async function isCategoryInUse(id: string): Promise<boolean> {
 /** Hard-delete only when unused; otherwise the caller should deactivate instead. */
 export async function deleteCategory(id: string): Promise<void> {
   await db.categories.delete(id)
+}
+
+/** Re-adds any of the built-in default categories that are missing entirely, and reactivates
+ *  any that exist but were deactivated — a lighter-weight recovery than a full app reset if
+ *  someone accidentally deletes/deactivates all their categories. Never duplicates a category
+ *  that's already present and active. Returns the names actually restored, if any. */
+export async function restoreDefaultCategories(kind: Category['kind']): Promise<string[]> {
+  const defaultNames = kind === 'donation' ? DEFAULT_DONATION_CATEGORY_NAMES : DEFAULT_EXPENSE_CATEGORY_NAMES
+  const existing = await listCategories(kind)
+  const restored: string[] = []
+
+  await db.transaction('rw', db.categories, async () => {
+    for (const name of defaultNames) {
+      const match = existing.find((c) => c.name.trim().toLowerCase() === name.toLowerCase())
+      if (!match) {
+        await db.categories.add({
+          id: generateId(),
+          kind,
+          name,
+          active: true,
+          order: existing.length + restored.length,
+          isDefault: true,
+        })
+        restored.push(name)
+      } else if (!match.active) {
+        await db.categories.update(match.id, { active: true })
+        restored.push(name)
+      }
+    }
+  })
+
+  return restored
 }

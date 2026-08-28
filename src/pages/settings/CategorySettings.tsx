@@ -8,6 +8,7 @@ import {
   isCategoryInUse,
   renameCategory,
   reorderCategories,
+  restoreDefaultCategories,
   setCategoryActive,
 } from '@/db/repositories/categories'
 import type { Category, CategoryKind } from '@/types'
@@ -53,9 +54,19 @@ function CategoryList({ kind, title }: { kind: CategoryKind; title: string }) {
     }
   }
 
+  async function handleRestoreDefaults() {
+    const restored = await restoreDefaultCategories(kind)
+    showToast(restored.length ? `Restored: ${restored.join(', ')}` : 'All default categories are already present.')
+  }
+
   return (
     <div className="settings-subsection">
-      <h3>{title}</h3>
+      <div className="settings-section__header">
+        <h3>{title}</h3>
+        <button type="button" className="link-button" onClick={handleRestoreDefaults}>
+          Restore Default Categories
+        </button>
+      </div>
       <ul className="manage-list">
         {categories.map((c, i) => (
           <li key={c.id} className={`manage-list__item ${!c.active ? 'manage-list__item--inactive' : ''}`}>

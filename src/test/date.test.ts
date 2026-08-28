@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   compareDateOnly,
+  daysBetweenTimestamps,
   formatDisplayDate,
   fromLocalParts,
   isDateInRange,
@@ -50,5 +51,11 @@ describe('date-only handling (timezone safety)', () => {
     expect(isDateInRange('2026-09-01', '2026-08-01', '2026-08-31')).toBe(false)
     expect(isDateInRange('2026-08-15')).toBe(true)
     expect(isDateInRange('2026-08-15', '2026-08-20')).toBe(false)
+  })
+
+  it('daysBetweenTimestamps counts whole days elapsed', () => {
+    expect(daysBetweenTimestamps('2026-08-20T10:00:00.000Z', '2026-08-27T10:00:00.000Z')).toBe(7)
+    expect(daysBetweenTimestamps('2026-08-20T10:00:00.000Z', '2026-08-20T18:00:00.000Z')).toBe(0)
+    expect(daysBetweenTimestamps('2026-08-20T10:00:00.000Z', '2026-08-20T10:00:00.000Z')).toBe(0)
   })
 })

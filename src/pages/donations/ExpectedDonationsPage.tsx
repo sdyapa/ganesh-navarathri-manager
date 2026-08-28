@@ -1,15 +1,18 @@
 import { useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { useYearContext } from '@/context/YearContext'
 import { useCategories, useExpectedDonations, useUnits } from '@/hooks/useYearData'
 import { usePagination } from '@/hooks/usePagination'
 import { useToast } from '@/context/ToastContext'
+import { useWhatsAppShare } from '@/hooks/useWhatsAppShare'
 import { DataTable, type DataTableColumn } from '@/components/common/DataTable'
+import { SectionTabs } from '@/components/common/SectionTabs'
 import { EmptyState } from '@/components/common/EmptyState'
 import { FilterBar, SearchInput, SelectFilter } from '@/components/common/Filters'
 import { Pagination } from '@/components/common/Pagination'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { SummaryList } from '@/components/common/SummaryList'
+import { FieldDiffList } from '@/components/common/FieldDiffList'
 import { DonationForm, defaultDonationFormValues, donationToFormValues } from './DonationForm'
 import {
   insertExpectedDonation,
@@ -20,6 +23,7 @@ import { convertExpectedDonationToDonation } from '@/services/conversionService'
 import { formatCurrency, formatNumber } from '@/lib/currency'
 import { formatDisplayDate, todayDateOnly } from '@/lib/date'
 import { matchesSearch } from '@/lib/tableUtils'
+import { diffFields } from '@/lib/diff'
 import type { DonationInput } from '@/lib/validation'
 import type { ExpectedDonation } from '@/types'
 
@@ -35,9 +39,11 @@ export function ExpectedDonationsPage() {
   const categories = useCategories('donation')
   const units = useUnits()
   const { showToast } = useToast()
+  const { shareDonation } = useWhatsAppShare()
   const [searchParams, setSearchParams] = useSearchParams()
 
   const [modal, setModal] = useState<ModalState>(searchParams.get('add') ? { mode: 'add' } : { mode: 'closed' })
+  const [pendingEdit, setPendingEdit] = useState<{ record: ExpectedDonation; input: DonationInput } | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ExpectedDonation | null>(null)
   const [busy, setBusy] = useState(false)
   const [search, setSearch] = useState('')
@@ -68,10 +74,35 @@ export function ExpectedDonationsPage() {
     showToast('Expected donation added')
   }
 
-  async function handleEdit(record: ExpectedDonation, input: DonationInput) {
-    await updateExpectedDonation(record.id, input)
-    setModal({ mode: 'closed' })
-    showToast('Expected donation updated')
+  function handleEditSubmit(record: ExpectedDonation, input: DonationInput) {
+    const changes = diffFields([
+      ['Donor Name', record.donorName, input.donorName],
+      ['Amount', formatCurrency(record.amount), formatCurrency(input.amount)],
+      ['Commodity', record.commodityName ?? '', input.commodityName ?? ''],
+      ['Quantity', formatNumber(record.quantity), formatNumber(input.quantity)],
+      ['Unit', unitName(record.unitId), unitName(input.unitId)],
+      ['Category', categoryName(record.categoryId), categoryName(input.categoryId)],
+      ['Expected Date', formatDisplayDate(record.date), formatDisplayDate(input.date)],
+      ['Notes', record.notes ?? '', input.notes ?? ''],
+    ])
+    if (changes.length === 0) {
+      setModal({ mode: 'closed' })
+      return
+    }
+    setPendingEdit({ record, input })
+  }
+
+  async function confirmEdit() {
+    if (!pendingEdit) return
+    setBusy(true)
+    try {
+      await updateExpectedDonation(pendingEdit.record.id, pendingEdit.input)
+      setPendingEdit(null)
+      setModal({ mode: 'closed' })
+      showToast('Expected donation updated')
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function handleConvert(record: ExpectedDonation, input: DonationInput) {
@@ -79,7 +110,10 @@ export function ExpectedDonationsPage() {
     try {
       await convertExpectedDonationToDonation(record.id, currentYearId!, input)
       setModal({ mode: 'closed' })
-      showToast('Converted to actual donation successfully')
+      showToast('Converted to actual donation successfully', 'success', {
+        label: 'Copy WhatsApp message',
+        onClick: () => shareDonation(input),
+      })
     } finally {
       setBusy(false)
     }
@@ -134,16 +168,18 @@ export function ExpectedDonationsPage() {
   return (
     <div className="page">
       <div className="page__header">
-        <div>
-          <h1>Expected Donations</h1>
-          <p className="page__subtitle">
-            <Link to="/donations">Actual Donations</Link> · <Link to="/donations/expected">Expected Donations</Link>
-          </p>
-        </div>
+        <h1>Expected Donations</h1>
         <button type="button" className="button button--primary" onClick={() => setModal({ mode: 'add' })}>
           + Add Expected Donation
         </button>
       </div>
+
+      <SectionTabs
+        tabs={[
+          { to: '/donations', label: 'Actual Donations', end: true },
+          { to: '/donations/expected', label: 'Expected Donations' },
+        ]}
+      />
 
       {records.length === 0 ? (
         <EmptyState
@@ -235,7 +271,7 @@ export function ExpectedDonationsPage() {
           initialValues={donationToFormValues(modal.record)}
           categories={categories}
           units={units}
-          onSubmit={(input) => handleEdit(modal.record, input)}
+          onSubmit={(input) => handleEditSubmit(modal.record, input)}
           onClose={() => setModal({ mode: 'closed' })}
         />
       )}
@@ -249,6 +285,26 @@ export function ExpectedDonationsPage() {
           units={units}
           onSubmit={(input) => handleConvert(modal.record, input)}
           onClose={() => setModal({ mode: 'closed' })}
+        />
+      )}
+
+      {pendingEdit && (
+        <ConfirmDialog
+          title="Confirm Changes"
+          summary={
+            <FieldDiffList
+              changes={diffFields([
+                ['Donor Name', pendingEdit.record.donorName, pendingEdit.input.donorName],
+                ['Amount', formatCurrency(pendingEdit.record.amount), formatCurrency(pendingEdit.input.amount)],
+                ['Category', categoryName(pendingEdit.record.categoryId), categoryName(pendingEdit.input.categoryId)],
+                ['Expected Date', formatDisplayDate(pendingEdit.record.date), formatDisplayDate(pendingEdit.input.date)],
+              ])}
+            />
+          }
+          confirmLabel="Save Changes"
+          onConfirm={confirmEdit}
+          onCancel={() => setPendingEdit(null)}
+          busy={busy}
         />
       )}
 

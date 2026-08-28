@@ -15,13 +15,14 @@ import { StatCard } from '@/components/common/StatCard'
 import { ExportButtons } from '@/components/common/ExportButtons'
 import { AuctionForm, defaultAuctionFormValues, auctionToFormValues } from './AuctionForm'
 import { insertAuction, updateAuction, deleteAuction } from '@/db/repositories/auctions'
-import { formatCurrency } from '@/lib/currency'
+import { formatCurrency, formatCurrencyForPdf } from '@/lib/currency'
 import { formatDisplayDate, isDateInRange } from '@/lib/date'
 import { matchesSearch } from '@/lib/tableUtils'
 import { diffFields } from '@/lib/diff'
 import { buildPdfReport, pdfFileName } from '@/lib/export/pdf'
 import { buildAuctionsTable } from '@/lib/export/reportBuilders'
 import { exportElementAsPng, pngFileName } from '@/lib/export/png'
+import { getAppSettings } from '@/db/repositories/settings'
 import type { AuctionInput } from '@/lib/validation'
 import type { Auction } from '@/types'
 
@@ -58,6 +59,7 @@ export function AuctionsPage() {
   }
 
   const total = auctions.reduce((sum, a) => sum + a.amount, 0)
+  const auctionCount = auctions.length
 
   async function handleAdd(input: AuctionInput) {
     await insertAuction(currentYearId!, input)
@@ -110,9 +112,12 @@ export function AuctionsPage() {
   async function handleExportPdf() {
     if (!currentYear) return
     try {
+      const { displayName } = await getAppSettings()
       const doc = await buildPdfReport({
         yearName: currentYear.name,
         reportTitle: 'Auction Report',
+        appName: displayName,
+        summaryLines: [`Total Auction Proceeds: ${formatCurrencyForPdf(total)} (${auctionCount} item(s))`],
         table: buildAuctionsTable(filtered),
       })
       doc.save(pdfFileName(currentYear.name, 'Auction Report'))
@@ -124,7 +129,13 @@ export function AuctionsPage() {
   async function handleExportPng() {
     if (!currentYear || !reportRef.current) return
     try {
-      await exportElementAsPng(reportRef.current, pngFileName(currentYear.name, 'Auction Report'))
+      const { displayName } = await getAppSettings()
+      await exportElementAsPng(reportRef.current, pngFileName(currentYear.name, 'Auction Report'), {
+        appName: displayName,
+        reportTitle: 'Auction Report',
+        yearName: currentYear.name,
+        summaryLines: [`Total Auction Proceeds: ${formatCurrency(total)} (${auctionCount} item(s))`],
+      })
     } catch {
       showToast('Could not generate image. Please try again.', 'error')
     }
@@ -166,7 +177,7 @@ export function AuctionsPage() {
 
       {auctions.length > 0 && (
         <div className="stat-grid stat-grid--compact">
-          <StatCard label="Total Auction Proceeds" value={formatCurrency(total)} tone="positive" hint={`${auctions.length} item(s)`} />
+          <StatCard label="Total Auction Proceeds" value={formatCurrency(total)} tone="positive" hint={`${auctionCount} item(s)`} />
         </div>
       )}
 

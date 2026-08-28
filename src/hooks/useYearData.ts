@@ -2,6 +2,7 @@
 // in one file since each is a one-line query — components import only the ones they need.
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/db/db'
+import { withAppSettingsDefaults } from '@/db/repositories/settings'
 
 export function useDonations(yearProfileId: string | undefined) {
   return useLiveQuery(
@@ -59,5 +60,12 @@ export function useUnits() {
 }
 
 export function useAppSettings() {
-  return useLiveQuery(() => db.appSettings.get('global'), [], undefined)
+  return useLiveQuery(
+    async () => {
+      const settings = await db.appSettings.get('global')
+      return settings ? withAppSettingsDefaults(settings) : undefined
+    },
+    [],
+    undefined,
+  )
 }

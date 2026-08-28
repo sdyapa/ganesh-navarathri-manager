@@ -19,11 +19,12 @@ import {
 import { DateRangeFilter } from '@/components/common/Filters'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ExportButtons } from '@/components/common/ExportButtons'
-import { formatCurrency, formatNumber } from '@/lib/currency'
+import { formatCurrency, formatCurrencyForPdf, formatNumber } from '@/lib/currency'
 import { isDateInRange, formatDisplayDate } from '@/lib/date'
 import { buildPdfReport, pdfFileName } from '@/lib/export/pdf'
 import { buildSummaryLines } from '@/lib/export/reportBuilders'
 import { exportElementAsPng, pngFileName } from '@/lib/export/png'
+import { getAppSettings } from '@/db/repositories/settings'
 
 const chartOptions = {
   responsive: true,
@@ -120,9 +121,11 @@ export function ReportsPage() {
   async function handleExportPdf() {
     if (!currentYear || !filteredSummary) return
     try {
+      const { displayName } = await getAppSettings()
       const doc = await buildPdfReport({
         yearName: currentYear.name,
         reportTitle: 'Reports & Charts Summary',
+        appName: displayName,
         summaryLines: [
           ...(dateFrom || dateTo ? [`Date range: ${dateFrom ? formatDisplayDate(dateFrom) : 'start'} to ${dateTo ? formatDisplayDate(dateTo) : 'today'}`] : []),
           ...buildSummaryLines(filteredSummary),
@@ -130,11 +133,11 @@ export function ReportsPage() {
         extraTables: [
           {
             heading: 'Donations by Category',
-            table: { head: ['Category', 'Total', 'Count'], rows: donationCategoryTotals.map((c) => [c.categoryName, formatCurrency(c.total), String(c.count)]) },
+            table: { head: ['Category', 'Total', 'Count'], rows: donationCategoryTotals.map((c) => [c.categoryName, formatCurrencyForPdf(c.total), String(c.count)]) },
           },
           {
             heading: 'Expenses by Category',
-            table: { head: ['Category', 'Total', 'Count'], rows: expenseCategoryTotals.map((c) => [c.categoryName, formatCurrency(c.total), String(c.count)]) },
+            table: { head: ['Category', 'Total', 'Count'], rows: expenseCategoryTotals.map((c) => [c.categoryName, formatCurrencyForPdf(c.total), String(c.count)]) },
           },
           {
             heading: 'Commodity Donations',
@@ -152,9 +155,21 @@ export function ReportsPage() {
   }
 
   async function handleExportPng() {
-    if (!currentYear || !reportRef.current) return
+    if (!currentYear || !filteredSummary || !reportRef.current) return
     try {
-      await exportElementAsPng(reportRef.current, pngFileName(currentYear.name, 'Reports Summary'))
+      const { displayName } = await getAppSettings()
+      await exportElementAsPng(reportRef.current, pngFileName(currentYear.name, 'Reports Summary'), {
+        appName: displayName,
+        reportTitle: 'Reports & Charts Summary',
+        yearName: currentYear.name,
+        summaryLines: [
+          ...(dateFrom || dateTo ? [`Date range: ${dateFrom ? formatDisplayDate(dateFrom) : 'start'} to ${dateTo ? formatDisplayDate(dateTo) : 'today'}`] : []),
+          `Monetary Donations: ${formatCurrency(filteredSummary.totalMonetaryDonations)}`,
+          `Auction Proceeds: ${formatCurrency(filteredSummary.totalAuctionProceeds)}`,
+          `Total Expenses: ${formatCurrency(filteredSummary.totalExpenses)}`,
+          `Closing Balance: ${formatCurrency(filteredSummary.closingBalance)}`,
+        ],
+      })
     } catch {
       showToast('Could not generate image. Please try again.', 'error')
     }
@@ -241,6 +256,69 @@ export function ReportsPage() {
               </div>
             </div>
           </div>
+
+          <section aria-labelledby="category-breakdown-heading">
+            <h2 id="category-breakdown-heading" className="section-title">
+              Category Breakdown
+            </h2>
+            <div className="chart-grid">
+              <div className="chart-card">
+                <h3>Donations by Category</h3>
+                {donationCategoryTotals.length === 0 ? (
+                  <p className="text-muted">No donations in this range.</p>
+                ) : (
+                  <div className="table-responsive">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Category</th>
+                          <th className="text-right">Amount</th>
+                          <th className="text-right">Count</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {donationCategoryTotals.map((c) => (
+                          <tr key={c.categoryId}>
+                            <td>{c.categoryName}</td>
+                            <td className="text-right">{formatCurrency(c.total)}</td>
+                            <td className="text-right">{c.count}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              <div className="chart-card">
+                <h3>Expenses by Category</h3>
+                {expenseCategoryTotals.length === 0 ? (
+                  <p className="text-muted">No expenses in this range.</p>
+                ) : (
+                  <div className="table-responsive">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Category</th>
+                          <th className="text-right">Amount</th>
+                          <th className="text-right">Count</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {expenseCategoryTotals.map((c) => (
+                          <tr key={c.categoryId}>
+                            <td>{c.categoryName}</td>
+                            <td className="text-right">{formatCurrency(c.total)}</td>
+                            <td className="text-right">{c.count}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
 
           <section aria-labelledby="commodity-heading">
             <h2 id="commodity-heading" className="section-title">

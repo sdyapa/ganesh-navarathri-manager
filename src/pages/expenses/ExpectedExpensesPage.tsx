@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
+import { SectionTabs } from '@/components/common/SectionTabs'
 import { useYearContext } from '@/context/YearContext'
 import { useCategories, useExpectedExpenses } from '@/hooks/useYearData'
 import { usePagination } from '@/hooks/usePagination'
@@ -10,6 +11,7 @@ import { FilterBar, SearchInput, SelectFilter } from '@/components/common/Filter
 import { Pagination } from '@/components/common/Pagination'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { SummaryList } from '@/components/common/SummaryList'
+import { FieldDiffList } from '@/components/common/FieldDiffList'
 import { ExpenseForm, defaultExpenseFormValues, expenseToFormValues } from './ExpenseForm'
 import {
   insertExpectedExpense,
@@ -20,6 +22,7 @@ import { moveExpectedExpenseToExpense } from '@/services/conversionService'
 import { formatCurrency } from '@/lib/currency'
 import { formatDisplayDate, todayDateOnly } from '@/lib/date'
 import { matchesSearch } from '@/lib/tableUtils'
+import { diffFields } from '@/lib/diff'
 import type { ExpenseInput } from '@/lib/validation'
 import type { ExpectedExpense } from '@/types'
 
@@ -37,6 +40,7 @@ export function ExpectedExpensesPage() {
   const [searchParams, setSearchParams] = useSearchParams()
 
   const [modal, setModal] = useState<ModalState>(searchParams.get('add') ? { mode: 'add' } : { mode: 'closed' })
+  const [pendingEdit, setPendingEdit] = useState<{ record: ExpectedExpense; input: ExpenseInput } | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<ExpectedExpense | null>(null)
   const [busy, setBusy] = useState(false)
   const [search, setSearch] = useState('')
@@ -66,10 +70,32 @@ export function ExpectedExpensesPage() {
     showToast('Expected expense added')
   }
 
-  async function handleEdit(record: ExpectedExpense, input: ExpenseInput) {
-    await updateExpectedExpense(record.id, input)
-    setModal({ mode: 'closed' })
-    showToast('Expected expense updated')
+  function handleEditSubmit(record: ExpectedExpense, input: ExpenseInput) {
+    const changes = diffFields([
+      ['Description', record.description, input.description],
+      ['Amount', formatCurrency(record.amount), formatCurrency(input.amount)],
+      ['Category', categoryName(record.categoryId), categoryName(input.categoryId)],
+      ['Expected Date', formatDisplayDate(record.date), formatDisplayDate(input.date)],
+      ['Notes', record.notes ?? '', input.notes ?? ''],
+    ])
+    if (changes.length === 0) {
+      setModal({ mode: 'closed' })
+      return
+    }
+    setPendingEdit({ record, input })
+  }
+
+  async function confirmEdit() {
+    if (!pendingEdit) return
+    setBusy(true)
+    try {
+      await updateExpectedExpense(pendingEdit.record.id, pendingEdit.input)
+      setPendingEdit(null)
+      setModal({ mode: 'closed' })
+      showToast('Expected expense updated')
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function handleMove(record: ExpectedExpense, input: ExpenseInput) {
@@ -126,16 +152,18 @@ export function ExpectedExpensesPage() {
   return (
     <div className="page">
       <div className="page__header">
-        <div>
-          <h1>Expected Expenses</h1>
-          <p className="page__subtitle">
-            <Link to="/expenses">Actual Expenses</Link> · <Link to="/expenses/expected">Expected Expenses</Link>
-          </p>
-        </div>
+        <h1>Expected Expenses</h1>
         <button type="button" className="button button--primary" onClick={() => setModal({ mode: 'add' })}>
           + Add Expected Expense
         </button>
       </div>
+
+      <SectionTabs
+        tabs={[
+          { to: '/expenses', label: 'Actual Expenses', end: true },
+          { to: '/expenses/expected', label: 'Expected Expenses' },
+        ]}
+      />
 
       {records.length === 0 ? (
         <EmptyState
@@ -223,7 +251,7 @@ export function ExpectedExpensesPage() {
           submitLabel="Save Changes"
           initialValues={expenseToFormValues(modal.record)}
           categories={categories}
-          onSubmit={(input) => handleEdit(modal.record, input)}
+          onSubmit={(input) => handleEditSubmit(modal.record, input)}
           onClose={() => setModal({ mode: 'closed' })}
         />
       )}
@@ -236,6 +264,26 @@ export function ExpectedExpensesPage() {
           categories={categories}
           onSubmit={(input) => handleMove(modal.record, input)}
           onClose={() => setModal({ mode: 'closed' })}
+        />
+      )}
+
+      {pendingEdit && (
+        <ConfirmDialog
+          title="Confirm Changes"
+          summary={
+            <FieldDiffList
+              changes={diffFields([
+                ['Description', pendingEdit.record.description, pendingEdit.input.description],
+                ['Amount', formatCurrency(pendingEdit.record.amount), formatCurrency(pendingEdit.input.amount)],
+                ['Category', categoryName(pendingEdit.record.categoryId), categoryName(pendingEdit.input.categoryId)],
+                ['Expected Date', formatDisplayDate(pendingEdit.record.date), formatDisplayDate(pendingEdit.input.date)],
+              ])}
+            />
+          }
+          confirmLabel="Save Changes"
+          onConfirm={confirmEdit}
+          onCancel={() => setPendingEdit(null)}
+          busy={busy}
         />
       )}
 

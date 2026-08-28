@@ -34,7 +34,11 @@ async function buildSettingsBlock() {
   return {
     categories,
     units,
-    appSettings: { whatsappTemplates: appSettings.whatsappTemplates, updatedAt: appSettings.updatedAt },
+    appSettings: {
+      displayName: appSettings.displayName,
+      whatsappTemplates: appSettings.whatsappTemplates,
+      updatedAt: appSettings.updatedAt,
+    },
   }
 }
 

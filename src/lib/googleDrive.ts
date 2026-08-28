@@ -1,12 +1,14 @@
 // Google Drive backup/restore using Google Identity Services (GIS) for browser-only OAuth —
 // no server, no client secret, safe for a static GitHub Pages app. Uses the narrow
 // `drive.file` scope, which only ever grants access to files this app itself created —
-// never the user's whole Drive.
+// never the user's whole Drive. `userinfo.email` is added alongside it purely so the app can
+// display which Google account is connected — useful on a shared committee device where more
+// than one person's Google account might get used — and grants no extra Drive access.
 //
 // The app fails gracefully (see isGoogleDriveConfigured) whenever VITE_GOOGLE_CLIENT_ID is
 // unset, which is the default until the user follows the README's Google Cloud setup guide.
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined
-const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file'
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.email'
 const GIS_SCRIPT_SRC = 'https://accounts.google.com/gsi/client'
 const APP_FOLDER_NAME = 'Ganesh Navarathri Manager Backups'
 
@@ -53,13 +55,29 @@ function loadGisScript(): Promise<void> {
 }
 
 let cachedToken: { token: string; expiresAt: number } | null = null
+let connectedEmail: string | undefined
+
+async function fetchConnectedEmail(token: string): Promise<string | undefined> {
+  try {
+    const resp = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!resp.ok) return undefined
+    const data = (await resp.json()) as { email?: string }
+    return data.email
+  } catch {
+    // Non-fatal — the connection still works for backup/restore even if we can't show whose
+    // account it is (e.g. offline right at this instant, or the userinfo endpoint hiccups).
+    return undefined
+  }
+}
 
 export async function connectGoogleDrive(): Promise<string> {
   if (!isGoogleDriveConfigured()) {
     throw new Error('Google Drive is not configured for this deployment. See Settings › Google Drive for setup instructions.')
   }
   await loadGisScript()
-  return new Promise((resolve, reject) => {
+  const token = await new Promise<string>((resolve, reject) => {
     const client = window.google!.accounts.oauth2.initTokenClient({
       client_id: CLIENT_ID!,
       scope: DRIVE_SCOPE,
@@ -74,6 +92,8 @@ export async function connectGoogleDrive(): Promise<string> {
     })
     client.requestAccessToken({ prompt: 'consent' })
   })
+  connectedEmail = await fetchConnectedEmail(token)
+  return token
 }
 
 async function getAccessToken(): Promise<string> {
@@ -86,10 +106,18 @@ export function disconnectGoogleDrive(): void {
     window.google.accounts.oauth2.revoke(cachedToken.token, () => undefined)
   }
   cachedToken = null
+  connectedEmail = undefined
 }
 
 export function isGoogleDriveConnected(): boolean {
   return !!cachedToken && cachedToken.expiresAt > Date.now()
+}
+
+/** The connected Google account's email, once known — undefined until fetchConnectedEmail
+ *  resolves (or if it failed, or if not connected at all). Useful on a shared device so the
+ *  committee can see whose account backups are going to. */
+export function getConnectedAccountEmail(): string | undefined {
+  return isGoogleDriveConnected() ? connectedEmail : undefined
 }
 
 async function driveFetch(url: string, init: RequestInit = {}): Promise<Response> {

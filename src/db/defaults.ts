@@ -1,6 +1,9 @@
-import type { Category, Unit } from '@/types'
+import type { Category, DriveBackupReminderSettings, Unit } from '@/types'
 import { generateId } from '@/lib/id'
 import { DEFAULT_COMMODITY_TEMPLATE, DEFAULT_MONETARY_TEMPLATE } from '@/lib/whatsapp'
+
+export const DEFAULT_DRIVE_REMINDER_INTERVAL_DAYS = 1
+export const DEFAULT_DISPLAY_NAME = 'Ganesh Navarathri Manager'
 
 export const DEFAULT_DONATION_CATEGORY_NAMES = ['Chanda', 'Annadanam', 'Auction']
 export const DEFAULT_EXPENSE_CATEGORY_NAMES = [
@@ -34,4 +37,8 @@ export function buildDefaultUnits(): Unit[] {
 
 export function buildDefaultWhatsAppTemplates() {
   return { monetary: DEFAULT_MONETARY_TEMPLATE, commodity: DEFAULT_COMMODITY_TEMPLATE }
+}
+
+export function buildDefaultDriveBackupReminder(): DriveBackupReminderSettings {
+  return { intervalDays: DEFAULT_DRIVE_REMINDER_INTERVAL_DAYS, lastBackupAt: null }
 }

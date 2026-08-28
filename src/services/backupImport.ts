@@ -20,6 +20,7 @@ import { nowIso } from '@/lib/date'
 import { listYearProfiles } from '@/db/repositories/yearProfiles'
 import { listCategories } from '@/db/repositories/categories'
 import { listUnits } from '@/db/repositories/units'
+import { getAppSettings } from '@/db/repositories/settings'
 
 export type ImportMode = 'add-new' | 'skip-duplicates' | 'replace-year' | 'replace-all'
 
@@ -175,6 +176,11 @@ export async function applyBackupImport(backup: ParsedBackupFile, mode: ImportMo
   const result = emptyResult()
 
   if (mode === 'replace-all') {
+    // driveBackupReminder is a per-device preference/fact, never part of a backup — preserve
+    // whatever this device already has instead of letting the import wipe it. displayName and
+    // whatsappTemplates fall back to the current values too, purely so an older backup that
+    // predates one of these fields doesn't blank it out.
+    const currentSettings = await getAppSettings()
     await db.transaction(
       'rw',
       [db.yearProfiles, db.donations, db.expectedDonations, db.expenses, db.expectedExpenses, db.auctions, db.categories, db.units, db.appSettings],
@@ -191,16 +197,18 @@ export async function applyBackupImport(backup: ParsedBackupFile, mode: ImportMo
         ])
         await db.categories.bulkAdd(backup.settings.categories as Category[])
         await db.units.bulkAdd(backup.settings.units as Unit[])
-        if (backup.settings.appSettings?.whatsappTemplates) {
-          await db.appSettings.put({
-            id: 'global',
-            whatsappTemplates: {
-              monetary: backup.settings.appSettings.whatsappTemplates.monetary ?? '',
-              commodity: backup.settings.appSettings.whatsappTemplates.commodity ?? '',
-            },
-            updatedAt: nowIso(),
-          })
-        }
+        await db.appSettings.put({
+          id: 'global',
+          displayName: backup.settings.appSettings?.displayName?.trim() || currentSettings.displayName,
+          whatsappTemplates: backup.settings.appSettings?.whatsappTemplates
+            ? {
+                monetary: backup.settings.appSettings.whatsappTemplates.monetary ?? currentSettings.whatsappTemplates.monetary,
+                commodity: backup.settings.appSettings.whatsappTemplates.commodity ?? currentSettings.whatsappTemplates.commodity,
+              }
+            : currentSettings.whatsappTemplates,
+          driveBackupReminder: currentSettings.driveBackupReminder,
+          updatedAt: nowIso(),
+        })
         for (const bundle of backup.years) {
           await db.yearProfiles.add(bundle.profile as YearProfile)
           await db.donations.bulkAdd(bundle.donations as Donation[])

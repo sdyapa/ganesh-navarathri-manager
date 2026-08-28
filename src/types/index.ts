@@ -111,9 +111,22 @@ export interface GoogleDriveState {
   accountEmail?: string
 }
 
+/** Local-only preference (never included in export/import backups — a device's own reminder
+ *  cadence and backup history shouldn't be overwritten by restoring someone else's data). */
+export interface DriveBackupReminderSettings {
+  intervalDays: number
+  lastBackupAt: IsoTimestamp | null
+}
+
 export interface AppSettings {
   id: 'global'
+  /** Customizable display name shown in the sidebar/top bar — lets a committee brand the app
+   *  as their own (e.g. a specific temple/mandal name) instead of the generic default. Named
+   *  "displayName" (not "appName") specifically to avoid colliding with the fixed `appName`
+   *  literal on BackupFile below, which identifies the backup *format*, not this preference. */
+  displayName: string
   whatsappTemplates: WhatsAppTemplates
+  driveBackupReminder: DriveBackupReminderSettings
   updatedAt: IsoTimestamp
 }
 
@@ -172,6 +185,9 @@ export interface BackupFile {
   settings: {
     categories: Category[]
     units: Unit[]
-    appSettings: Omit<AppSettings, 'id'>
+    // Only the portable preferences travel in a backup. driveBackupReminder is deliberately
+    // excluded — it's a per-device fact (this device's last backup time, its reminder cadence)
+    // that restoring someone else's data shouldn't overwrite.
+    appSettings: Pick<AppSettings, 'displayName' | 'whatsappTemplates' | 'updatedAt'>
   }
 }

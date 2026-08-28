@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
+import { SectionTabs } from '@/components/common/SectionTabs'
 import { useYearContext } from '@/context/YearContext'
 import { useCategories, useDonations, useUnits } from '@/hooks/useYearData'
 import { usePagination } from '@/hooks/usePagination'
@@ -15,13 +16,14 @@ import { SummaryList } from '@/components/common/SummaryList'
 import { ExportButtons } from '@/components/common/ExportButtons'
 import { DonationForm, defaultDonationFormValues, donationToFormValues } from './DonationForm'
 import { insertDonation, updateDonation, deleteDonation } from '@/db/repositories/donations'
-import { formatCurrency, formatNumber } from '@/lib/currency'
+import { formatCurrency, formatCurrencyForPdf, formatNumber } from '@/lib/currency'
 import { formatDisplayDate, isDateInRange } from '@/lib/date'
 import { matchesSearch } from '@/lib/tableUtils'
 import { diffFields } from '@/lib/diff'
 import { buildPdfReport, pdfFileName } from '@/lib/export/pdf'
-import { buildDonationsTable } from '@/lib/export/reportBuilders'
+import { buildMonetaryDonationsTable, buildCommodityDonationsTable } from '@/lib/export/reportBuilders'
 import { exportElementAsPng, pngFileName } from '@/lib/export/png'
+import { getAppSettings } from '@/db/repositories/settings'
 import type { DonationInput } from '@/lib/validation'
 import type { Donation } from '@/types'
 
@@ -126,11 +128,23 @@ export function DonationsPage() {
   async function handleExportPdf() {
     if (!currentYear) return
     try {
+      const { displayName } = await getAppSettings()
+      const monetaryTotal = filtered.filter((d) => d.type === 'monetary').reduce((s, d) => s + (d.amount ?? 0), 0)
+      const commodityCount = filtered.filter((d) => d.type === 'commodity').length
       const doc = await buildPdfReport({
         yearName: currentYear.name,
         reportTitle: 'Donations Report',
+        appName: displayName,
         orientation: 'landscape',
-        table: buildDonationsTable(filtered, categories!, units!),
+        summaryLines: [
+          `Total Monetary Donations: ${formatCurrencyForPdf(monetaryTotal)}`,
+          `Commodity Donations: ${commodityCount}`,
+          `Total Records: ${filtered.length}`,
+        ],
+        extraTables: [
+          { heading: 'Monetary Donations', table: buildMonetaryDonationsTable(filtered, categories!) },
+          { heading: 'Commodity Donations', table: buildCommodityDonationsTable(filtered, categories!, units!) },
+        ],
       })
       doc.save(pdfFileName(currentYear.name, 'Donations Report'))
     } catch {
@@ -141,7 +155,19 @@ export function DonationsPage() {
   async function handleExportPng() {
     if (!currentYear || !reportRef.current) return
     try {
-      await exportElementAsPng(reportRef.current, pngFileName(currentYear.name, 'Donations Report'))
+      const { displayName } = await getAppSettings()
+      const monetaryTotal = filtered.filter((d) => d.type === 'monetary').reduce((s, d) => s + (d.amount ?? 0), 0)
+      const commodityCount = filtered.filter((d) => d.type === 'commodity').length
+      await exportElementAsPng(reportRef.current, pngFileName(currentYear.name, 'Donations Report'), {
+        appName: displayName,
+        reportTitle: 'Donations Report',
+        yearName: currentYear.name,
+        summaryLines: [
+          `Total Monetary Donations: ${formatCurrency(monetaryTotal)}`,
+          `Commodity Donations: ${commodityCount}`,
+          `Total Records: ${filtered.length}`,
+        ],
+      })
     } catch {
       showToast('Could not generate image. Please try again.', 'error')
     }
@@ -187,16 +213,18 @@ export function DonationsPage() {
   return (
     <div className="page">
       <div className="page__header">
-        <div>
-          <h1>Donations</h1>
-          <p className="page__subtitle">
-            <Link to="/donations">Actual Donations</Link> · <Link to="/donations/expected">Expected Donations</Link>
-          </p>
-        </div>
+        <h1>Donations</h1>
         <button type="button" className="button button--primary" onClick={() => setModal({ mode: 'add' })}>
           + Add Donation
         </button>
       </div>
+
+      <SectionTabs
+        tabs={[
+          { to: '/donations', label: 'Actual Donations', end: true },
+          { to: '/donations/expected', label: 'Expected Donations' },
+        ]}
+      />
 
       {donations.length === 0 ? (
         <EmptyState

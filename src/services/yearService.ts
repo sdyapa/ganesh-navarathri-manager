@@ -73,6 +73,16 @@ export async function createYearProfile(options: CreateYearOptions): Promise<Yea
   })
 }
 
+/** Like createYearProfile, but reuses an existing profile for that year instead of throwing —
+ *  for callers (like sample-data seeding) where "this year already exists" is an expected,
+ *  recoverable case rather than a user error. */
+export async function getOrCreateYearProfile(options: CreateYearOptions): Promise<{ profile: YearProfile; created: boolean }> {
+  const existing = (await listYearProfiles()).find((p) => p.year === options.year)
+  if (existing) return { profile: existing, created: false }
+  const profile = await createYearProfile(options)
+  return { profile, created: true }
+}
+
 export async function renameYearProfile(id: string, name: string): Promise<void> {
   await updateYearProfile(id, { name: name.trim() })
 }

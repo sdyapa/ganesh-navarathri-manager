@@ -1,11 +1,16 @@
 import { NavLink } from 'react-router-dom'
 import { NAV_ITEMS } from './navItems'
+import { useAppSettings } from '@/hooks/useYearData'
+import { DEFAULT_DISPLAY_NAME } from '@/db/defaults'
 
 export function Sidebar() {
+  const displayName = useAppSettings()?.displayName ?? DEFAULT_DISPLAY_NAME
+
   return (
     <nav className="sidebar" aria-label="Primary">
       <div className="sidebar__brand">
-        <span aria-hidden="true">🕉️</span> Ganesh Navarathri
+        <span aria-hidden="true">🕉️</span>
+        <span className="sidebar__brand-text">{displayName}</span>
       </div>
       <ul className="sidebar__list">
         {NAV_ITEMS.map((item) => (

@@ -1,5 +1,6 @@
 import { db } from '@/db/db'
 import { generateId } from '@/lib/id'
+import { DEFAULT_UNIT_NAMES } from '@/db/defaults'
 import type { Unit } from '@/types'
 
 export async function listUnits(): Promise<Unit[]> {
@@ -38,4 +39,26 @@ export async function isUnitInUse(id: string): Promise<boolean> {
 
 export async function deleteUnit(id: string): Promise<void> {
   await db.units.delete(id)
+}
+
+/** Re-adds any missing built-in default units and reactivates any that were deactivated —
+ *  see restoreDefaultCategories in categories.ts for the same idea and full rationale. */
+export async function restoreDefaultUnits(): Promise<string[]> {
+  const existing = await listUnits()
+  const restored: string[] = []
+
+  await db.transaction('rw', db.units, async () => {
+    for (const name of DEFAULT_UNIT_NAMES) {
+      const match = existing.find((u) => u.name.trim().toLowerCase() === name.toLowerCase())
+      if (!match) {
+        await db.units.add({ id: generateId(), name, active: true, order: existing.length + restored.length, isDefault: true })
+        restored.push(name)
+      } else if (!match.active) {
+        await db.units.update(match.id, { active: true })
+        restored.push(name)
+      }
+    }
+  })
+
+  return restored
 }

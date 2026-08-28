@@ -2,7 +2,15 @@ import { useState } from 'react'
 import { useUnits } from '@/hooks/useYearData'
 import { useToast } from '@/context/ToastContext'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
-import { deleteUnit, insertUnit, isUnitInUse, renameUnit, reorderUnits, setUnitActive } from '@/db/repositories/units'
+import {
+  deleteUnit,
+  insertUnit,
+  isUnitInUse,
+  renameUnit,
+  reorderUnits,
+  restoreDefaultUnits,
+  setUnitActive,
+} from '@/db/repositories/units'
 import type { Unit } from '@/types'
 
 export function UnitSettings() {
@@ -46,9 +54,19 @@ export function UnitSettings() {
     }
   }
 
+  async function handleRestoreDefaults() {
+    const restored = await restoreDefaultUnits()
+    showToast(restored.length ? `Restored: ${restored.join(', ')}` : 'All default units are already present.')
+  }
+
   return (
     <div className="settings-section">
-      <h2>Units</h2>
+      <div className="settings-section__header">
+        <h2>Units</h2>
+        <button type="button" className="link-button" onClick={handleRestoreDefaults}>
+          Restore Default Units
+        </button>
+      </div>
       <p className="page__note">Units used by existing commodity donations are deactivated rather than deleted, so history stays intact.</p>
       <ul className="manage-list">
         {units.map((u, i) => (

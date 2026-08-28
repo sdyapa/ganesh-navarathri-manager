@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
+import { SectionTabs } from '@/components/common/SectionTabs'
 import { useYearContext } from '@/context/YearContext'
 import { useCategories, useExpenses } from '@/hooks/useYearData'
 import { usePagination } from '@/hooks/usePagination'
@@ -14,13 +15,14 @@ import { SummaryList } from '@/components/common/SummaryList'
 import { ExportButtons } from '@/components/common/ExportButtons'
 import { ExpenseForm, defaultExpenseFormValues, expenseToFormValues } from './ExpenseForm'
 import { insertExpense, updateExpense, deleteExpense } from '@/db/repositories/expenses'
-import { formatCurrency } from '@/lib/currency'
+import { formatCurrency, formatCurrencyForPdf } from '@/lib/currency'
 import { formatDisplayDate, isDateInRange } from '@/lib/date'
 import { matchesSearch } from '@/lib/tableUtils'
 import { diffFields } from '@/lib/diff'
 import { buildPdfReport, pdfFileName } from '@/lib/export/pdf'
 import { buildExpensesTable } from '@/lib/export/reportBuilders'
 import { exportElementAsPng, pngFileName } from '@/lib/export/png'
+import { getAppSettings } from '@/db/repositories/settings'
 import type { ExpenseInput } from '@/lib/validation'
 import type { Expense } from '@/types'
 
@@ -113,9 +115,13 @@ export function ExpensesPage() {
   async function handleExportPdf() {
     if (!currentYear) return
     try {
+      const { displayName } = await getAppSettings()
+      const total = filtered.reduce((s, e) => s + e.amount, 0)
       const doc = await buildPdfReport({
         yearName: currentYear.name,
         reportTitle: 'Expenses Report',
+        appName: displayName,
+        summaryLines: [`Total Expenses: ${formatCurrencyForPdf(total)}`, `Total Records: ${filtered.length}`],
         table: buildExpensesTable(filtered, categories!),
       })
       doc.save(pdfFileName(currentYear.name, 'Expenses Report'))
@@ -127,7 +133,14 @@ export function ExpensesPage() {
   async function handleExportPng() {
     if (!currentYear || !reportRef.current) return
     try {
-      await exportElementAsPng(reportRef.current, pngFileName(currentYear.name, 'Expenses Report'))
+      const { displayName } = await getAppSettings()
+      const total = filtered.reduce((s, e) => s + e.amount, 0)
+      await exportElementAsPng(reportRef.current, pngFileName(currentYear.name, 'Expenses Report'), {
+        appName: displayName,
+        reportTitle: 'Expenses Report',
+        yearName: currentYear.name,
+        summaryLines: [`Total Expenses: ${formatCurrency(total)}`, `Total Records: ${filtered.length}`],
+      })
     } catch {
       showToast('Could not generate image. Please try again.', 'error')
     }
@@ -158,16 +171,18 @@ export function ExpensesPage() {
   return (
     <div className="page">
       <div className="page__header">
-        <div>
-          <h1>Expenses</h1>
-          <p className="page__subtitle">
-            <Link to="/expenses">Actual Expenses</Link> · <Link to="/expenses/expected">Expected Expenses</Link>
-          </p>
-        </div>
+        <h1>Expenses</h1>
         <button type="button" className="button button--primary" onClick={() => setModal({ mode: 'add' })}>
           + Add Expense
         </button>
       </div>
+
+      <SectionTabs
+        tabs={[
+          { to: '/expenses', label: 'Actual Expenses', end: true },
+          { to: '/expenses/expected', label: 'Expected Expenses' },
+        ]}
+      />
 
       {expenses.length === 0 ? (
         <EmptyState

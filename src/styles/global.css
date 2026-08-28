@@ -93,12 +93,13 @@ ul { list-style: none; margin: 0; padding: 0; }
 .sidebar { display: none; }
 
 .top-bar {
-  height: var(--top-bar-height);
+  min-height: var(--top-bar-height);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-3);
-  padding: 0 var(--space-4);
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-2) var(--space-4);
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
   position: sticky;
@@ -106,19 +107,42 @@ ul { list-style: none; margin: 0; padding: 0; }
   z-index: 20;
 }
 .top-bar__brand {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-weight: 700;
   font-size: 1rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  min-width: 0;
+  /* Its own full-width row below ~480px — sharing a row with the year dropdown squeezed the
+     (user-customizable, arbitrary-length) display name down to just a few visible characters. */
+  flex: 1 1 100%;
 }
+.top-bar__brand-text { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+.year-switcher {
+  flex: 1 1 auto;
+  max-width: 100%;
+}
 .year-switcher select {
+  /* `width: auto` alone renders unreliably narrow for a <select> in a flex/sticky context in
+     some engines regardless of the selected option's text — a min-width keeps it usable. */
+  width: 100%;
+  min-width: 140px;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
   background: var(--color-surface);
-  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (min-width: 480px) {
+  /* Wide enough for the default display name and the dropdown side by side without either
+     being crowded out — below this, they stack into two full-width rows instead. */
+  .top-bar__brand { flex: 1 1 auto; }
+  .year-switcher { flex: 0 1 auto; max-width: 55%; }
+  .year-switcher select { width: auto; max-width: 100%; }
 }
 
 .bottom-nav {
@@ -160,10 +184,19 @@ ul { list-style: none; margin: 0; padding: 0; }
     top: 0;
   }
   .sidebar__brand {
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+    min-width: 0;
     font-weight: 700;
     padding: var(--space-5) var(--space-4) var(--space-4);
     font-size: 1.05rem;
+    line-height: 1.25;
   }
+  /* Wraps onto a second line instead of truncating with an ellipsis — the sidebar has vertical
+     room to spare, so a long custom display name (Settings › General) stays fully readable
+     rather than being cut down to a handful of characters. */
+  .sidebar__brand-text { min-width: 0; overflow-wrap: break-word; }
   .sidebar__list { display: flex; flex-direction: column; gap: 2px; padding: 0 var(--space-2); }
   .sidebar__link {
     display: flex;
@@ -186,14 +219,30 @@ ul { list-style: none; margin: 0; padding: 0; }
   }
 }
 
+/* Two YearSwitcher instances exist in the DOM (one per breakpoint's header) — only ever show
+   the one that matches the current layout, never both at once. */
+.desktop-year-switcher { display: none; }
+
 @media (min-width: 900px) {
   .app-shell__main { position: relative; }
-  .year-switcher {
+  .desktop-year-switcher {
+    display: block;
     position: sticky;
     top: var(--space-4);
-    display: inline-block;
+    width: fit-content;
+    /* Isolated in its own corner here (unlike the mobile top bar, nothing else competes for
+       this space), so it can comfortably fit a full year/profile name rather than truncating
+       eagerly — the cap only exists to stop a genuinely long custom name from running wild. */
+    max-width: min(420px, 60%);
     margin: var(--space-4) var(--space-6) 0 auto;
-    float: right;
+  }
+  .desktop-year-switcher .year-switcher select {
+    width: auto;
+    min-width: 220px;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 
@@ -489,9 +538,25 @@ ul { list-style: none; margin: 0; padding: 0; }
 /* ==========================================================================
    Settings
    ========================================================================== */
-.settings-tabs { display: flex; gap: var(--space-2); overflow-x: auto; border-bottom: 1px solid var(--color-border); padding-bottom: 2px; }
-.settings-tabs__tab { background: none; border: none; padding: 10px 6px; font-weight: 600; color: var(--color-text-muted); cursor: pointer; white-space: nowrap; border-bottom: 3px solid transparent; }
-.settings-tabs__tab--active { color: var(--color-primary-dark); border-bottom-color: var(--color-primary); }
+/* Generic tab strip — used by Settings sections, and by SectionTabs (Actual/Expected). */
+.tabs { display: flex; gap: var(--space-2); overflow-x: auto; border-bottom: 1px solid var(--color-border); padding-bottom: 2px; }
+.tabs__tab {
+  background: none;
+  border: none;
+  padding: 10px 6px;
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  border-bottom: 3px solid transparent;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.tabs__tab--active { color: var(--color-primary-dark); border-bottom-color: var(--color-primary); }
+.tabs__tab .badge { pointer-events: none; }
 .settings-panel { padding-top: var(--space-2); }
 .settings-section { display: flex; flex-direction: column; gap: var(--space-4); }
 .settings-section__header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap; }
@@ -525,6 +590,23 @@ ul { list-style: none; margin: 0; padding: 0; }
 
 .notice { padding: var(--space-3); border-radius: var(--radius-sm); font-size: 0.88rem; }
 .notice--warning { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+
+.backup-reminder-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  color: #92400e;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+  font-size: 0.88rem;
+}
+.backup-reminder-banner__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.backup-reminder-banner .icon-button { background: transparent; border-color: #fde68a; color: #92400e; }
 
 .import-mode-fieldset { border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: var(--space-3); display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-3); }
 .import-mode-fieldset legend { font-weight: 700; padding: 0 4px; }

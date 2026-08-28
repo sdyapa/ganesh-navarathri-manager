@@ -38,12 +38,18 @@ export function WhatsAppSettings() {
   const [commodity, setCommodity] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
 
+  // Deliberately depends on the two template strings themselves, NOT the whole `settings`
+  // object. AppSettings is one shared document (templates + the Drive backup reminder state),
+  // so `settings` gets a new reference on every write to either — including a backup
+  // completing from the reminder banner, which is visible on this very page. Depending on the
+  // object would silently discard an unsaved in-progress edit whenever that happened.
   useEffect(() => {
     if (settings) {
       setMonetary(settings.whatsappTemplates.monetary)
       setCommodity(settings.whatsappTemplates.commodity)
     }
-  }, [settings])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings?.whatsappTemplates.monetary, settings?.whatsappTemplates.commodity])
 
   if (!settings) return null
 

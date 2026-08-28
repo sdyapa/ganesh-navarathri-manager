@@ -103,6 +103,20 @@ export const whatsappTemplatesSchema = z.object({
   commodity: z.string().min(1, 'Template cannot be empty').max(2000),
 })
 
+export const driveReminderIntervalSchema = z
+  .number({ invalid_type_error: 'Enter a number of days' })
+  .int('Enter a whole number of days')
+  .min(1, 'Must be at least 1 day')
+  .max(365, 'Must be 365 days or fewer')
+
+// Kept short deliberately — this renders in the sidebar and a mobile top bar alongside the
+// year switcher, so an overly long name defeats the point of making it customizable.
+export const displayNameSchema = z
+  .string()
+  .trim()
+  .min(1, 'App name cannot be empty')
+  .max(40, 'Keep it under 40 characters so it fits in the navigation')
+
 // ---------- Backup file structural validation ----------
 // `.passthrough()` on nested objects means unknown fields from a *future* app version survive
 // a round trip instead of being stripped or rejected — required records are still checked.
@@ -228,6 +242,7 @@ export const backupFileSchema = z
         units: z.array(backupUnitSchema).default([]),
         appSettings: z
           .object({
+            displayName: z.string().optional(),
             whatsappTemplates: z
               .object({ monetary: z.string(), commodity: z.string() })
               .partial()

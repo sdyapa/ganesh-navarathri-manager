@@ -87,3 +87,10 @@ export function formatTimestamp(iso: string): string {
 export function nowIso(): string {
   return new Date().toISOString()
 }
+
+/** Whole days elapsed between two ISO timestamps (not date-only values — this is for
+ *  bookkeeping timestamps like "last backup at", where timezone rounding doesn't matter). */
+export function daysBetweenTimestamps(fromIso: string, toIso: string): number {
+  const ms = new Date(toIso).getTime() - new Date(fromIso).getTime()
+  return Math.floor(ms / (24 * 60 * 60 * 1000))
+}

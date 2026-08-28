@@ -40,6 +40,15 @@ export class AppDatabase extends Dexie {
       units: 'id, active, order',
       appSettings: 'id',
     })
+    // v2: unitId was queried (isUnitInUse, in units.ts) but never indexed — that throws a
+    // SchemaError the moment it actually runs (e.g. deleting a unit from Settings). Adding an
+    // index requires a version bump; a database already created at v1 upgrades automatically
+    // the next time this app opens it.
+    this.version(2).stores({
+      donations: 'id, yearProfileId, date, type, categoryId, donorName, unitId, [yearProfileId+date], [yearProfileId+type]',
+      expectedDonations:
+        'id, yearProfileId, date, type, status, categoryId, unitId, [yearProfileId+status], [yearProfileId+date]',
+    })
   }
 }
 

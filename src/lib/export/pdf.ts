@@ -7,8 +7,37 @@
 // chunk and never bloat the initial page load — most visits never export a PDF at all (spec
 // "Performance": lazy-load reports/exports where appropriate).
 import { formatDisplayDate, formatTimestamp } from '@/lib/date'
+import { needsRasterRendering, rasterizeText } from './pdfUnicodeText'
 import { APP_NAME } from '@/types'
 import type jsPDF from 'jspdf'
+
+/** Draws text with doc.text() when it's plain ASCII/Latin-1 (crisp vector text, the common
+ *  case); falls back to a rasterized image for any other script — see pdfUnicodeText.ts. */
+function drawText(doc: jsPDF, text: string, x: number, y: number, fontSizePt: number, options: { bold?: boolean; colorGray?: number } = {}) {
+  if (!needsRasterRendering(text)) {
+    doc.text(text, x, y)
+    return
+  }
+  const gray = options.colorGray ?? 0
+  const color = `rgb(${gray}, ${gray}, ${gray})`
+  const { dataUrl, widthPt, heightPt, baselineOffsetPt } = rasterizeText(text, fontSizePt, { bold: options.bold, color })
+  doc.addImage(dataUrl, 'PNG', x, y - baselineOffsetPt, widthPt, heightPt)
+}
+
+/** Same fallback as drawText(), for autoTable cells — suppresses autoTable's own (garbled) text
+ *  draw for a non-Latin cell and paints a rasterized image over it instead. Registered once per
+ *  table via the didParseCell/didDrawCell hooks below. */
+function rasterizeNonLatinCellText(doc: jsPDF, cell: { raw: unknown; text: string[]; x: number; y: number; width: number; height: number; styles: { fontSize: number; cellPadding: number } }) {
+  const raw = Array.isArray(cell.raw) ? cell.raw.join(' ') : String(cell.raw ?? '')
+  if (!needsRasterRendering(raw)) return
+  const pad = typeof cell.styles.cellPadding === 'number' ? cell.styles.cellPadding : 4
+  const { dataUrl, widthPt, heightPt } = rasterizeText(raw, cell.styles.fontSize || 8)
+  const maxWidth = Math.max(1, cell.width - pad * 2)
+  const width = Math.min(widthPt, maxWidth)
+  const height = width < widthPt ? heightPt * (width / widthPt) : heightPt
+  const y = cell.y + (cell.height - height) / 2
+  doc.addImage(dataUrl, 'PNG', cell.x + pad, y, width, height)
+}
 
 export interface PdfTableSpec {
   head: string[]
@@ -18,6 +47,11 @@ export interface PdfTableSpec {
 export interface PdfReportOptions {
   yearName: string
   reportTitle: string
+  /** Shown as the document's top heading — the user's customizable display name
+   *  (Settings › General), not the fixed internal APP_NAME. Callers must pass it explicitly;
+   *  it defaults to APP_NAME only so a caller that genuinely doesn't care still gets a sane
+   *  heading rather than a blank one. */
+  appName?: string
   orientation?: 'portrait' | 'landscape'
   /** Short key/value lines shown under the title (e.g. totals). */
   summaryLines?: string[]
@@ -38,15 +72,15 @@ export async function buildPdfReport(options: PdfReportOptions): Promise<jsPDF> 
 
   doc.setFontSize(16)
   doc.setFont('helvetica', 'bold')
-  doc.text(APP_NAME, margin, cursorY)
+  drawText(doc, options.appName ?? APP_NAME, margin, cursorY, 16, { bold: true })
   cursorY += 20
 
   doc.setFontSize(13)
-  doc.text(`${options.reportTitle} — ${options.yearName}`, margin, cursorY)
+  doc.setFont('helvetica', 'normal')
+  drawText(doc, `${options.reportTitle} — ${options.yearName}`, margin, cursorY, 13)
   cursorY += 16
 
   doc.setFontSize(9)
-  doc.setFont('helvetica', 'normal')
   doc.setTextColor(100)
   doc.text(`Generated: ${formatTimestamp(new Date().toISOString())}`, margin, cursorY)
   doc.setTextColor(0)
@@ -55,7 +89,7 @@ export async function buildPdfReport(options: PdfReportOptions): Promise<jsPDF> 
   if (options.summaryLines?.length) {
     doc.setFontSize(10)
     for (const line of options.summaryLines) {
-      doc.text(line, margin, cursorY)
+      drawText(doc, line, margin, cursorY, 10)
       cursorY += 14
     }
     cursorY += 6
@@ -69,6 +103,19 @@ export async function buildPdfReport(options: PdfReportOptions): Promise<jsPDF> 
       margin: { left: margin, right: margin },
       styles: { fontSize: 8, cellPadding: 4, overflow: 'linebreak' },
       headStyles: { fillColor: [234, 88, 12] },
+      // Non-Latin cell content (e.g. a donor name or notes written in Telugu/Hindi/Tamil) can't
+      // render via autoTable's own Helvetica-based text draw — see pdfUnicodeText.ts. Blank the
+      // text here so autoTable skips drawing it, then paint a rasterized image over the cell in
+      // didDrawCell instead.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      willDrawCell: (data: any) => {
+        const raw = Array.isArray(data.cell.raw) ? data.cell.raw.join(' ') : String(data.cell.raw ?? '')
+        if (needsRasterRendering(raw)) data.cell.text = []
+      },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      didDrawCell: (data: any) => {
+        rasterizeNonLatinCellText(doc, data.cell)
+      },
       didDrawPage: () => {
         const pageCount = doc.getNumberOfPages()
         doc.setFontSize(8)
@@ -93,7 +140,7 @@ export async function buildPdfReport(options: PdfReportOptions): Promise<jsPDF> 
       }
       doc.setFontSize(11)
       doc.setFont('helvetica', 'bold')
-      doc.text(extra.heading, margin, cursorY)
+      drawText(doc, extra.heading, margin, cursorY, 11, { bold: true })
       doc.setFont('helvetica', 'normal')
       cursorY += 12
       cursorY = renderTable(extra.table, cursorY) + 24

@@ -10,6 +10,7 @@ import { formatDisplayDate, todayDateOnly } from '@/lib/date'
 import { buildPdfReport, pdfFileName } from '@/lib/export/pdf'
 import { buildSummaryLines } from '@/lib/export/reportBuilders'
 import { exportElementAsPng, pngFileName } from '@/lib/export/png'
+import { getAppSettings } from '@/db/repositories/settings'
 
 export function Dashboard() {
   const { loading, currentYear, summary, donations, expenses, auctions, expectedDonations } = useYearSummary()
@@ -23,9 +24,11 @@ export function Dashboard() {
   async function handleExportPdf() {
     if (!currentYear || !summary) return
     try {
+      const { displayName } = await getAppSettings()
       const doc = await buildPdfReport({
         yearName: currentYear.name,
         reportTitle: 'Summary Report',
+        appName: displayName,
         summaryLines: buildSummaryLines(summary),
       })
       doc.save(pdfFileName(currentYear.name, 'Summary Report'))
@@ -35,9 +38,21 @@ export function Dashboard() {
   }
 
   async function handleExportPng() {
-    if (!currentYear || !reportRef.current) return
+    if (!currentYear || !summary || !reportRef.current) return
     try {
-      await exportElementAsPng(reportRef.current, pngFileName(currentYear.name, 'Summary Report'))
+      const { displayName } = await getAppSettings()
+      await exportElementAsPng(reportRef.current, pngFileName(currentYear.name, 'Summary Report'), {
+        appName: displayName,
+        reportTitle: 'Summary Report',
+        yearName: currentYear.name,
+        summaryLines: [
+          `Opening Balance: ${formatCurrency(summary.openingBalance)}`,
+          `Monetary Donations: ${formatCurrency(summary.totalMonetaryDonations)} (${summary.counts.monetaryDonations})`,
+          `Auction Proceeds: ${formatCurrency(summary.totalAuctionProceeds)} (${summary.counts.auctions})`,
+          `Total Expenses: ${formatCurrency(summary.totalExpenses)} (${summary.counts.expenses})`,
+          `Closing Balance: ${formatCurrency(summary.closingBalance)}`,
+        ],
+      })
     } catch {
       showToast('Could not generate image. Please try again.', 'error')
     }

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { Modal } from '@/components/common/Modal'
 import { FormField } from '@/components/common/FormField'
+import { useCloseGuard } from '@/hooks/useCloseGuard'
 import { expenseInputSchema, type ExpenseInput } from '@/lib/validation'
 import { todayDateOnly } from '@/lib/date'
 import type { Category, Expense, ExpectedExpense } from '@/types'
@@ -40,6 +41,7 @@ export function ExpenseForm({ title, submitLabel, initialValues, categories, onS
   const [values, setValues] = useState(initialValues)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
+  const { requestClose, confirmDialog } = useCloseGuard(values, initialValues, onClose)
   const activeCategories = categories.filter((c) => c.active || c.id === values.categoryId)
 
   const set = <K extends keyof ExpenseFormValues>(key: K, value: ExpenseFormValues[K]) =>
@@ -71,12 +73,13 @@ export function ExpenseForm({ title, submitLabel, initialValues, categories, onS
   }
 
   return (
+    <>
     <Modal
       title={title}
-      onClose={onClose}
+      onClose={requestClose}
       footer={
         <>
-          <button type="button" className="button button--ghost" onClick={onClose} disabled={submitting}>
+          <button type="button" className="button button--ghost" onClick={requestClose} disabled={submitting}>
             Cancel
           </button>
           <button type="submit" form="expense-form" className="button button--primary" disabled={submitting}>
@@ -125,5 +128,7 @@ export function ExpenseForm({ title, submitLabel, initialValues, categories, onS
         </FormField>
       </form>
     </Modal>
+    {confirmDialog}
+    </>
   )
 }

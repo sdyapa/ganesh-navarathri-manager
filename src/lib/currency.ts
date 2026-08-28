@@ -22,6 +22,16 @@ export function formatNumber(value: number | undefined | null): string {
   return inrNumberFormatter.format(v)
 }
 
+/** For jsPDF-generated PDF text only — never use this for on-screen UI. jsPDF's built-in
+ *  "standard 14" fonts (Helvetica/Times/Courier) don't include a glyph for ₹ (U+20B9), so
+ *  passing formatCurrency()'s output straight into doc.text() renders a garbled character in
+ *  its place. "Rs." is plain ASCII and renders correctly with those fonts, no embedded custom
+ *  font required. Keeps the same Indian digit grouping as formatCurrency. */
+export function formatCurrencyForPdf(amount: number | undefined | null): string {
+  const value = Number.isFinite(amount) ? (amount as number) : 0
+  return `Rs. ${inrNumberFormatter.format(value)}`
+}
+
 export function parseAmountInput(value: string): number {
   const cleaned = value.replace(/[₹,\s]/g, '')
   const n = Number(cleaned)

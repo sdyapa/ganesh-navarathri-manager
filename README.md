@@ -69,22 +69,55 @@ build on Node 18+, you can safely bump these — Vite 5, Vitest 2, and the lates
 Requires [Node.js](https://nodejs.org) 16.14+ (see the toolchain note above; Node 18+ also
 works and lets you use newer dependency versions).
 
-```bash
+### Quick start (every time you want to run it locally)
+
+```powershell
+# 1. Open a terminal (PowerShell) in the project folder.
+# 2. If `node`/`npm` aren't on PATH in this terminal (fresh terminals often don't have them),
+#    add them for THIS session only — this line does not persist to new terminal windows/tabs,
+#    so re-run it whenever you open a new terminal and `npm` isn't found:
+$env:PATH = "C:\Program Files\nodejs;" + $env:PATH
+
+# 3. First time only (or whenever package.json changes): install dependencies.
 npm install
+
+# 4. Start the dev server.
 npm run dev
 ```
 
-Opens the app at `http://localhost:5173/`. Data is stored in your browser's IndexedDB — it
-persists across refreshes and restarts, but is specific to that browser profile.
+Vite prints the URL to open, e.g. `Local: http://localhost:5173/` — open that in your browser.
+Leave the terminal window running; closing it (or pressing Ctrl+C in it) stops the server. Data
+is stored in your browser's IndexedDB — it persists across refreshes and restarts, but is
+specific to that browser profile (switching browsers or using a private/incognito window starts
+with an empty database).
+
+**If the browser says "Unable to connect"**, the dev server isn't actually running — check the
+terminal: it should show `VITE ... ready in ...ms` followed by the `Local:` URL. If instead it
+shows an error, or the terminal prompt just came back with nothing printed, the PATH step above
+was likely skipped or run in a different terminal window than the one running `npm run dev`.
 
 **On a corporate network with a TLS-inspecting proxy**, `npm install` may fail with
 `SELF_SIGNED_CERT_IN_CHAIN`. Fix it by pointing Node at your organization's trusted root
 certificates instead of disabling TLS verification:
 
 ```powershell
-# Export the Windows trusted root/intermediate certs to a PEM bundle once, then reuse it:
+# Export the Windows trusted root/intermediate certs to a PEM bundle once (already done on this
+# machine — the bundle lives at ~/corporate-ca-bundle.pem), then point Node at it every time:
 $env:NODE_EXTRA_CA_CERTS = "$HOME\corporate-ca-bundle.pem"
 npm install
+```
+
+If that bundle doesn't exist yet (e.g. on a different machine), generate it once with:
+
+```powershell
+$outFile = "$HOME\corporate-ca-bundle.pem"
+if (Test-Path $outFile) { Remove-Item $outFile }
+foreach ($storePath in @("Cert:\LocalMachine\Root", "Cert:\LocalMachine\CA", "Cert:\CurrentUser\Root", "Cert:\CurrentUser\CA")) {
+  Get-ChildItem $storePath -ErrorAction SilentlyContinue | ForEach-Object {
+    $b64 = [Convert]::ToBase64String($_.RawData, 'InsertLineBreaks')
+    Add-Content -Path $outFile -Value "-----BEGIN CERTIFICATE-----`n$b64`n-----END CERTIFICATE-----"
+  }
+}
 ```
 
 ## 5. Testing
@@ -115,24 +148,66 @@ The test suite focuses on the parts that must never be wrong:
 
 ## 6. Build & GitHub Pages Deployment
 
-### One-time setup
+### Step-by-step (personal account example: github.com/sdyapa)
 
-1. Push this repository to GitHub.
-2. In the repo's **Settings › Pages**, set the source to **GitHub Actions**.
-3. (Optional) If you're using Google Drive backup, add a repository secret named
-   `VITE_GOOGLE_CLIENT_ID` — see [§7](#7-google-drive-setup).
+This repo currently has no `origin` remote — these steps create the GitHub repo and wire it up.
+The `.github/workflows/deploy.yml` in this repo already handles the build/deploy automatically
+once Pages is turned on, so this is a one-time setup.
 
-The included workflow (`.github/workflows/deploy.yml`) builds and deploys automatically on
-every push to `main`. It sets `VITE_BASE_PATH` to `/<repository-name>/` automatically, which is
-what a **project page** (`https://<username>.github.io/<repository>/`) needs.
+1. **Create the repo on GitHub** (in the browser, logged in as `sdyapa`):
+   go to <https://github.com/new>, set:
+   - Repository name: `ganesh-navarathri-manager` (or any name you like — see the note below if
+     you pick something different)
+   - Visibility: your choice (Public or Private both work with GitHub Pages)
+   - **Do not** check "Add a README" / `.gitignore` / license — this repo already has commits
+     and an empty GitHub repo avoids a merge conflict on first push.
 
-### Manual build
+   Click **Create repository**.
+
+2. **Point this local repo at it and push** (run in the project folder):
+
+   ```powershell
+   $env:PATH = "C:\Program Files\nodejs;" + $env:PATH   # if node/git need it in this terminal
+   git branch -M main
+   git remote add origin https://github.com/sdyapa/ganesh-navarathri-manager.git
+   git push -u origin main
+   ```
+
+   The first push will prompt for GitHub authentication in the browser (or a credential
+   manager popup) — sign in as `sdyapa` when asked. After this, `git push` alone updates it.
+
+3. **Turn on GitHub Pages**: on the repo page, go to **Settings → Pages**, and under "Build and
+   deployment" set **Source** to **GitHub Actions**.
+
+4. **Trigger the deploy**: pushing to `main` (step 2) already triggers it. Watch progress under
+   the repo's **Actions** tab — the "Deploy to GitHub Pages" workflow runs `npm ci`, tests, and
+   builds automatically. When it finishes (green check), your app is live at:
+
+   ```
+   https://sdyapa.github.io/ganesh-navarathri-manager/
+   ```
+
+   (Settings → Pages also shows this URL once the first deploy succeeds.)
+
+5. **(Optional) Google Drive backup**: add a repository secret named `VITE_GOOGLE_CLIENT_ID`
+   under **Settings → Secrets and variables → Actions** — see [§7](#7-google-drive-setup). Skip
+   this for now; the app works fully without it, just with Drive backup disabled.
+
+**If you pick a different repository name** than `ganesh-navarathri-manager`, no code change is
+needed — the workflow reads the repo name automatically and sets `VITE_BASE_PATH` to
+`/<repository-name>/` for you, so the live URL simply becomes
+`https://sdyapa.github.io/<repository-name>/`.
+
+**Updating the live site later**: any time you commit changes and `git push`, the Action
+rebuilds and redeploys automatically — no manual steps.
+
+### Manual build (without GitHub Actions)
 
 ```bash
-# Project page, e.g. https://username.github.io/ganesh-navarathri-manager/
+# Project page, e.g. https://sdyapa.github.io/ganesh-navarathri-manager/
 VITE_BASE_PATH=/ganesh-navarathri-manager/ npm run build
 
-# User/organization root page, e.g. https://username.github.io/
+# User/organization root page, e.g. https://sdyapa.github.io/
 npm run build
 ```
 

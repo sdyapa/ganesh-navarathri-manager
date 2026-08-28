@@ -1,7 +1,8 @@
-// Generates placeholder PWA icons (flat orange square + white rounded glyph) as real PNG
-// files using only Node's built-in zlib — no image library dependency needed for a build
-// step that only ever runs once. Replace public/icons/*.png with real branded artwork before
-// a real deployment; these exist so the PWA manifest has valid icons out of the box.
+// Generates placeholder PWA icons (flat orange background + a cream temple-bell silhouette,
+// echoing the 🕉️ used elsewhere in the app's branding) as real PNG files using only Node's
+// built-in zlib — no image library dependency needed for a build step that only ever runs once.
+// Replace public/icons/*.png with real branded artwork before a real deployment; these exist so
+// the PWA manifest has valid icons out of the box.
 import { deflateSync } from 'node:zlib'
 import { writeFileSync, mkdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -39,24 +40,41 @@ function chunk(type, data) {
   return Buffer.concat([lenBuf, typeBuf, data, crcBuf])
 }
 
+// A temple-bell (ghanta) silhouette: a rounded dome (upper arc of a circle) flaring linearly
+// into a wider rim below it — two simple curves, kept detail-free (no handle/clapper) so it
+// still reads clearly at the smallest 192px size rather than blurring into noise.
+function isBellGlyph(gx, gy, R) {
+  const domeCenterY = -0.1 * R
+  const domeRadius = 0.5 * R
+  const rimHalfWidth = 0.9 * R
+  const domeTopY = domeCenterY - domeRadius
+  const rimY = 0.55 * R
+
+  if (gy < domeTopY || gy > rimY) return false
+
+  let halfWidth
+  if (gy <= domeCenterY) {
+    const under = domeRadius * domeRadius - (gy - domeCenterY) * (gy - domeCenterY)
+    halfWidth = under > 0 ? Math.sqrt(under) : 0
+  } else {
+    const t = (gy - domeCenterY) / (rimY - domeCenterY)
+    halfWidth = domeRadius + (rimHalfWidth - domeRadius) * t
+  }
+  return Math.abs(gx) <= halfWidth
+}
+
 function buildPng(size, { maskable = false } = {}) {
   const pixels = Buffer.alloc(size * size * 3)
   const center = size / 2
-  // Rounded-square glyph in the middle, inset further for maskable icons per the safe-zone spec.
+  // Glyph bounding radius, inset further for maskable icons per the safe-zone spec.
   const inset = maskable ? size * 0.28 : size * 0.22
   const glyphRadius = size / 2 - inset
-  const cornerRadius = glyphRadius * 0.3
 
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
-      const dx = Math.abs(x - center)
-      const dy = Math.abs(y - center)
-      const insideSquare = dx <= glyphRadius && dy <= glyphRadius
-      const cornerCutoff =
-        dx > glyphRadius - cornerRadius && dy > glyphRadius - cornerRadius
-          ? Math.hypot(dx - (glyphRadius - cornerRadius), dy - (glyphRadius - cornerRadius)) <= cornerRadius
-          : true
-      const isGlyph = insideSquare && cornerCutoff
+      const gx = x - center
+      const gy = y - center
+      const isGlyph = isBellGlyph(gx, gy, glyphRadius)
       const color = isGlyph ? CREAM : ORANGE
       const idx = (y * size + x) * 3
       pixels[idx] = color[0]

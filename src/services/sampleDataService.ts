@@ -9,9 +9,21 @@ import { insertExpectedDonation } from '@/db/repositories/expectedDonations'
 import { insertExpense } from '@/db/repositories/expenses'
 import { insertExpectedExpense } from '@/db/repositories/expectedExpenses'
 import { insertAuction } from '@/db/repositories/auctions'
-import { createYearProfile } from '@/services/yearService'
+import { listDonationsForYear } from '@/db/repositories/donations'
+import { listExpensesForYear } from '@/db/repositories/expenses'
+import { listAuctionsForYear } from '@/db/repositories/auctions'
+import { getOrCreateYearProfile } from '@/services/yearService'
 import { fromLocalParts, toLocalDate, todayDateOnly } from '@/lib/date'
 import type { Category, Unit } from '@/types'
+
+export class YearHasRealDataError extends Error {
+  constructor(public readonly yearName: string) {
+    super(
+      `"${yearName}" already has real records in it, so sample data was not added there to avoid mixing fake and real financial data. Use a year that doesn't exist yet, or remove/export the existing records first.`,
+    )
+    this.name = 'YearHasRealDataError'
+  }
+}
 
 function byName(categories: Category[], name: string): Category {
   const found = categories.find((c) => c.name === name)
@@ -32,7 +44,31 @@ function dateOffset(base: string, days: number): string {
   return fromLocalParts(d.getFullYear(), d.getMonth() + 1, d.getDate())
 }
 
-export async function seedSampleData(): Promise<{ yearsCreated: string[] }> {
+/** Resolves a year to seed into: reuses an existing empty profile for that year (e.g. the
+ *  current year, which the app always auto-creates on first launch) rather than failing
+ *  because it "already exists" — but refuses to seed into a year that already has real
+ *  records, so sample and real financial data never get mixed. */
+async function resolveSeedYear(
+  year: number,
+  name: string,
+  carryForward: boolean,
+  carryForwardFromYearId?: string,
+) {
+  const { profile, created } = await getOrCreateYearProfile({ year, name, carryForward, carryForwardFromYearId })
+  if (!created) {
+    const [donations, expenses, auctions] = await Promise.all([
+      listDonationsForYear(profile.id),
+      listExpensesForYear(profile.id),
+      listAuctionsForYear(profile.id),
+    ])
+    if (donations.length + expenses.length + auctions.length > 0) {
+      throw new YearHasRealDataError(profile.name)
+    }
+  }
+  return { profile, created }
+}
+
+export async function seedSampleData(): Promise<{ yearsCreated: string[]; yearsReused: string[] }> {
   await ensureAppInitialized()
   const categories = await listCategories()
   const units = await listUnits()
@@ -53,11 +89,11 @@ export async function seedSampleData(): Promise<{ yearsCreated: string[] }> {
 
   const currentYear = new Date().getFullYear()
   const prevYear = currentYear - 1
-  const prevProfile = await createYearProfile({
-    year: prevYear,
-    name: `Ganesh Navarathri ${prevYear} (Sample)`,
-    carryForward: false,
-  })
+  const { profile: prevProfile, created: prevCreated } = await resolveSeedYear(
+    prevYear,
+    `Ganesh Navarathri ${prevYear} (Sample)`,
+    false,
+  )
   const start = `${prevYear}-08-20`
 
   for (let i = 0; i < 12; i++) {
@@ -97,12 +133,12 @@ export async function seedSampleData(): Promise<{ yearsCreated: string[] }> {
   await insertExpense(prevProfile.id, { description: 'Pandal and lighting setup', amount: 22000, date: dateOffset(start, 0), categoryId: expenseCats.setup.id })
   await insertExpense(prevProfile.id, { description: 'Visarjan procession arrangements', amount: 9000, date: dateOffset(start, 10), categoryId: expenseCats.nimajjanam.id })
 
-  const currentProfile = await createYearProfile({
-    year: currentYear,
-    name: `Ganesh Navarathri ${currentYear} (Sample)`,
-    carryForward: true,
-    carryForwardFromYearId: prevProfile.id,
-  })
+  const { profile: currentProfile, created: currentCreated } = await resolveSeedYear(
+    currentYear,
+    `Ganesh Navarathri ${currentYear} (Sample)`,
+    true,
+    prevProfile.id,
+  )
   const start2 = `${currentYear}-08-20`
   for (let i = 0; i < 9; i++) {
     await insertDonation(currentProfile.id, {
@@ -140,5 +176,15 @@ export async function seedSampleData(): Promise<{ yearsCreated: string[] }> {
     categoryId: expenseCats.nimajjanam.id,
   })
 
-  return { yearsCreated: [prevProfile.name, currentProfile.name] }
+  const createdProfiles = [prevCreated && prevProfile, currentCreated && currentProfile].filter(Boolean) as Array<{
+    name: string
+  }>
+  const reusedProfiles = [!prevCreated && prevProfile, !currentCreated && currentProfile].filter(Boolean) as Array<{
+    name: string
+  }>
+
+  return {
+    yearsCreated: createdProfiles.map((p) => p.name),
+    yearsReused: reusedProfiles.map((p) => p.name),
+  }
 }

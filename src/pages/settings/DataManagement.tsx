@@ -89,9 +89,14 @@ export function DataManagement() {
   async function handleSeedSample() {
     setBusy(true)
     try {
-      const { yearsCreated } = await seedSampleData()
-      showToast(`Sample data created: ${yearsCreated.join(', ')}`)
+      const { yearsCreated, yearsReused } = await seedSampleData()
+      const parts: string[] = []
+      if (yearsCreated.length) parts.push(`created ${yearsCreated.join(', ')}`)
+      if (yearsReused.length) parts.push(`added sample records into existing ${yearsReused.join(', ')}`)
+      showToast(`Sample data ready — ${parts.join('; ')}.`)
       setShowSampleConfirm(false)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Could not load sample data.', 'error')
     } finally {
       setBusy(false)
     }
@@ -259,7 +264,7 @@ export function DataManagement() {
       {showSampleConfirm && (
         <ConfirmDialog
           title="Load Sample Data?"
-          description="This creates two new year profiles filled with realistic demo donations, expenses, and auctions. It does not touch your existing years."
+          description="This adds realistic demo donations, expenses, and auctions for the current year and the previous year. A year that doesn't exist yet is created fresh; a year that already exists (e.g. the current year, which always exists by default) has the sample records added into it — but only if it's still empty, so real data is never mixed with fake data."
           confirmLabel="Load Sample Data"
           onConfirm={handleSeedSample}
           onCancel={() => setShowSampleConfirm(false)}

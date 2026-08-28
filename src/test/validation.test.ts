@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   auctionInputSchema,
   backupFileSchema,
+  displayNameSchema,
   donationInputSchema,
+  driveReminderIntervalSchema,
   expenseInputSchema,
 } from '@/lib/validation'
 import { BACKUP_SCHEMA_VERSION } from '@/types'
@@ -40,6 +42,37 @@ describe('donationInputSchema', () => {
   it('rejects a missing donor name or invalid date', () => {
     expect(donationInputSchema.safeParse({ ...base, donorName: '', type: 'monetary', amount: 100 }).success).toBe(false)
     expect(donationInputSchema.safeParse({ ...base, date: 'not-a-date', type: 'monetary', amount: 100 }).success).toBe(false)
+  })
+})
+
+describe('driveReminderIntervalSchema', () => {
+  it('accepts whole numbers of days from 1 to 365', () => {
+    expect(driveReminderIntervalSchema.safeParse(1).success).toBe(true)
+    expect(driveReminderIntervalSchema.safeParse(365).success).toBe(true)
+    expect(driveReminderIntervalSchema.safeParse(7).success).toBe(true)
+  })
+
+  it('rejects zero, negative, fractional, out-of-range, and non-numeric values', () => {
+    expect(driveReminderIntervalSchema.safeParse(0).success).toBe(false)
+    expect(driveReminderIntervalSchema.safeParse(-1).success).toBe(false)
+    expect(driveReminderIntervalSchema.safeParse(1.5).success).toBe(false)
+    expect(driveReminderIntervalSchema.safeParse(366).success).toBe(false)
+    expect(driveReminderIntervalSchema.safeParse(NaN).success).toBe(false)
+  })
+})
+
+describe('displayNameSchema', () => {
+  it('accepts a reasonable custom name and trims whitespace', () => {
+    const result = displayNameSchema.safeParse('  Sri Ganesh Mandal  ')
+    expect(result.success).toBe(true)
+    if (result.success) expect(result.data).toBe('Sri Ganesh Mandal')
+  })
+
+  it('rejects an empty or excessively long name', () => {
+    expect(displayNameSchema.safeParse('').success).toBe(false)
+    expect(displayNameSchema.safeParse('   ').success).toBe(false)
+    expect(displayNameSchema.safeParse('A'.repeat(41)).success).toBe(false)
+    expect(displayNameSchema.safeParse('A'.repeat(40)).success).toBe(true)
   })
 })
 
