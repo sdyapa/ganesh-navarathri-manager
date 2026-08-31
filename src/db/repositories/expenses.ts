@@ -1,6 +1,7 @@
 import { db } from '@/db/db'
 import { generateId } from '@/lib/id'
 import { nowIso } from '@/lib/date'
+import { upsertProfileFromName } from './profiles'
 import type { Expense } from '@/types'
 import type { ExpenseInput } from '@/lib/validation'
 
@@ -26,11 +27,13 @@ export async function insertExpense(
     date: input.date,
     categoryId: input.categoryId,
     notes: input.notes?.trim() || undefined,
+    vendorName: input.vendorName?.trim() || undefined,
     sourceExpectedExpenseId: sourceExpectedExpenseId ?? null,
     createdAt: now,
     updatedAt: now,
   }
   await db.expenses.add(expense)
+  await upsertProfileFromName('vendor', expense.vendorName)
   return expense
 }
 
@@ -41,8 +44,10 @@ export async function updateExpense(id: string, input: ExpenseInput): Promise<vo
     date: input.date,
     categoryId: input.categoryId,
     notes: input.notes?.trim() || undefined,
+    vendorName: input.vendorName?.trim() || undefined,
     updatedAt: nowIso(),
   })
+  await upsertProfileFromName('vendor', input.vendorName)
 }
 
 export async function deleteExpense(id: string): Promise<void> {

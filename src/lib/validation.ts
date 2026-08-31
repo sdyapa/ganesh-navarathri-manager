@@ -61,6 +61,7 @@ export const expenseInputSchema = z.object({
   date: dateOnly,
   categoryId: nonEmpty('Category'),
   notes,
+  vendorName: z.string().trim().max(100, 'Vendor name is too long').optional(),
 })
 
 export type ExpenseInput = z.infer<typeof expenseInputSchema>
@@ -147,6 +148,7 @@ export const backupExpectedDonationSchema = backupDonationSchema
   .extend({
     status: z.enum(['pending', 'converted']),
     convertedDonationId: z.string().nullable().optional(),
+    sourceAuctionId: z.string().nullable().optional(),
   })
   .passthrough()
 
@@ -157,6 +159,7 @@ export const backupExpenseSchema = recordBaseSchema
     date: z.string(),
     categoryId: z.string(),
     notes: z.string().optional(),
+    vendorName: z.string().optional(),
     sourceExpectedExpenseId: z.string().nullable().optional(),
   })
   .passthrough()
@@ -179,6 +182,7 @@ export const backupAuctionSchema = z
     notes: z.string().optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
+    convertedToExpectedDonationId: z.string().nullable().optional(),
   })
   .passthrough()
 
@@ -217,6 +221,15 @@ export const backupUnitSchema = z
   })
   .passthrough()
 
+export const backupProfileSchema = z
+  .object({
+    id: z.string(),
+    kind: z.enum(['person', 'vendor']),
+    name: z.string(),
+    order: z.number(),
+  })
+  .passthrough()
+
 export const backupYearBundleSchema = z
   .object({
     profile: backupYearProfileSchema,
@@ -240,6 +253,7 @@ export const backupFileSchema = z
       .object({
         categories: z.array(backupCategorySchema).default([]),
         units: z.array(backupUnitSchema).default([]),
+        profiles: z.array(backupProfileSchema).default([]),
         appSettings: z
           .object({
             displayName: z.string().optional(),

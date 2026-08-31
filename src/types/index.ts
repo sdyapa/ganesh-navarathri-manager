@@ -57,17 +57,25 @@ export interface ExpectedDonation extends BaseRecord {
   status: ExpectedStatus
   /** Set once converted, pointing at the resulting Donation. */
   convertedDonationId?: string | null
+  /** Set when this pledge was generated from an Auction win (see conversionService's
+   *  convertAuctionToExpectedDonation) — the auction winner typically pays the following year,
+   *  not immediately, so the auction becomes a pending pledge here rather than an actual Donation. */
+  sourceAuctionId?: string | null
 }
 
 export interface Expense extends BaseRecord {
   description: string
   amount: number
+  /** Optional — Expense historically had no person/entity field at all, only free-text
+   *  description, so this must stay optional for every pre-existing record to remain valid. */
+  vendorName?: string
   sourceExpectedExpenseId?: string | null
 }
 
 export interface ExpectedExpense extends BaseRecord {
   description: string
   amount: number
+  vendorName?: string
   status: ExpectedStatus
   convertedExpenseId?: string | null
 }
@@ -82,6 +90,9 @@ export interface Auction {
   notes?: string
   createdAt: IsoTimestamp
   updatedAt: IsoTimestamp
+  /** Set once this auction win has been converted into a pending Expected Donation for next
+   *  year (see conversionService's convertAuctionToExpectedDonation). */
+  convertedToExpectedDonationId?: string | null
 }
 
 export interface Category {
@@ -99,6 +110,21 @@ export interface Unit {
   active: boolean
   order: number
   isDefault: boolean
+}
+
+export type ProfileKind = 'person' | 'vendor'
+
+/** A reusable, cross-year name registry for autocompletion — 'person' covers both donors and
+ *  auction participants (the same real people commonly fill both roles across years), 'vendor'
+ *  covers who an expense was paid to. Unlike Category/Unit, no other record stores a foreign
+ *  key to a Profile — donor/vendor/person fields stay plain free text (an autocomplete
+ *  suggestion, not a strict picker), so there's no referential integrity to protect and no
+ *  active/isDefault/in-use tracking is needed: deleting a Profile is always simply safe. */
+export interface Profile {
+  id: string
+  kind: ProfileKind
+  name: string
+  order: number
 }
 
 export interface WhatsAppTemplates {
@@ -134,8 +160,13 @@ export interface FinancialSummary {
   yearProfileId: string
   openingBalance: number
   totalMonetaryDonations: number
+  /** Reported for visibility only — deliberately excluded from closingBalance. An auction win
+   *  is a pledge, not cash in hand; the winner pays the following year (see
+   *  conversionService's convertAuctionToExpectedDonation). */
   totalAuctionProceeds: number
   totalExpenses: number
+  /** = openingBalance + totalMonetaryDonations - totalExpenses. Deliberately excludes
+   *  totalAuctionProceeds — see its doc comment above. */
   closingBalance: number
   totalCommodityDonationCount: number
   expectedMonetaryDonations: number
@@ -185,6 +216,7 @@ export interface BackupFile {
   settings: {
     categories: Category[]
     units: Unit[]
+    profiles: Profile[]
     // Only the portable preferences travel in a backup. driveBackupReminder is deliberately
     // excluded — it's a per-device fact (this device's last backup time, its reminder cadence)
     // that restoring someone else's data shouldn't overwrite.

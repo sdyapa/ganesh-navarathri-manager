@@ -52,8 +52,9 @@ function auction(overrides: Partial<Auction>): Auction {
 
 describe('computeFinancialSummary', () => {
   it('matches the spec worked example exactly', () => {
-    // Opening 20,000 + donations 1,00,000 + auction 20,000 - expenses 70,000 = 70,000
-    // Expected donations/expenses and commodity donations must NOT affect this number.
+    // Opening 20,000 + donations 1,00,000 - expenses 70,000 = 50,000
+    // Expected donations/expenses, commodity donations, and auction proceeds must NOT affect
+    // this number — an auction win is a pledge, not cash, until collected the following year.
     const donations: Donation[] = [donation({ id: 'd1', amount: 100000, type: 'monetary' })]
     const commodity: Donation[] = [
       donation({ id: 'd2', type: 'commodity', commodityName: 'Rice', quantity: 50, unitId: 'kg', amount: undefined }),
@@ -77,7 +78,7 @@ describe('computeFinancialSummary', () => {
       auctions,
     })
 
-    expect(summary.closingBalance).toBe(70000)
+    expect(summary.closingBalance).toBe(50000)
     expect(summary.totalMonetaryDonations).toBe(100000)
     expect(summary.totalAuctionProceeds).toBe(20000)
     expect(summary.totalExpenses).toBe(70000)
@@ -86,6 +87,29 @@ describe('computeFinancialSummary', () => {
     expect(summary.totalCommodityDonationCount).toBe(1)
     expect(summary.counts.monetaryDonations).toBe(1)
     expect(summary.counts.commodityDonations).toBe(1)
+  })
+
+  it('never lets auction proceeds affect the closing balance — a win is a pledge, not cash, until collected next year', () => {
+    const withoutAuction = computeFinancialSummary({
+      yearProfileId: 'y1',
+      openingBalance: 1000,
+      donations: [donation({ amount: 5000 })],
+      expectedDonations: [],
+      expenses: [expense({ amount: 2000 })],
+      expectedExpenses: [],
+      auctions: [],
+    })
+    const withAuction = computeFinancialSummary({
+      yearProfileId: 'y1',
+      openingBalance: 1000,
+      donations: [donation({ amount: 5000 })],
+      expectedDonations: [],
+      expenses: [expense({ amount: 2000 })],
+      expectedExpenses: [],
+      auctions: [auction({ amount: 999999 })],
+    })
+    expect(withAuction.closingBalance).toBe(withoutAuction.closingBalance)
+    expect(withAuction.totalAuctionProceeds).toBe(999999)
   })
 
   it('excludes converted expected donations/expenses from expected totals', () => {
@@ -122,7 +146,8 @@ describe('computeFinancialSummary', () => {
 
 describe('carry-forward', () => {
   it('uses the exact previous closing balance as next opening balance', () => {
-    // 2026: opening 0 + donations 1,50,000 + auction 20,000 - expenses 1,00,000 = 70,000
+    // 2026: opening 0 + donations 1,50,000 - expenses 1,00,000 = 50,000 (the 20,000 auction
+    // win is a pledge, not cash yet, so it's excluded — see the computeFinancialSummary test above)
     const summary2026 = computeFinancialSummary({
       yearProfileId: 'y2026',
       openingBalance: 0,
@@ -132,12 +157,12 @@ describe('carry-forward', () => {
       expectedExpenses: [],
       auctions: [auction({ amount: 20000 })],
     })
-    expect(summary2026.closingBalance).toBe(70000)
+    expect(summary2026.closingBalance).toBe(50000)
 
     const opening2027 = computeCarryForwardOpeningBalance(summary2026.closingBalance)
-    expect(opening2027).toBe(70000)
+    expect(opening2027).toBe(50000)
 
-    // 2027: opening 70,000 + donations 30,000 - expenses 20,000 = 80,000
+    // 2027: opening 50,000 + donations 30,000 - expenses 20,000 = 60,000
     const summary2027 = computeFinancialSummary({
       yearProfileId: 'y2027',
       openingBalance: opening2027,
@@ -147,7 +172,7 @@ describe('carry-forward', () => {
       expectedExpenses: [],
       auctions: [],
     })
-    expect(summary2027.closingBalance).toBe(80000)
+    expect(summary2027.closingBalance).toBe(60000)
   })
 })
 
@@ -204,13 +229,16 @@ describe('computeCategoryTotals', () => {
 })
 
 describe('computeDailyTrend', () => {
-  it('aggregates donations, expenses and auctions per day and computes net', () => {
+  it('aggregates donations, expenses and auctions per day, and excludes auctions from net cash flow', () => {
     const donations = [donation({ date: '2026-08-20', amount: 1000 })]
     const expenses = [expense({ date: '2026-08-20', amount: 400 })]
     const auctions = [auction({ date: '2026-08-20', amount: 200 })]
     const trend = computeDailyTrend(donations, expenses, auctions)
     expect(trend).toHaveLength(1)
-    expect(trend[0].net).toBe(1000 + 200 - 400)
+    expect(trend[0].auctions).toBe(200)
+    // net excludes auctions — a win isn't cash until collected next year (same rule as
+    // computeFinancialSummary's closingBalance).
+    expect(trend[0].net).toBe(1000 - 400)
   })
 
   it('excludes commodity donations from the monetary trend line', () => {

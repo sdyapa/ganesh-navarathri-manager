@@ -1,6 +1,7 @@
 import { db } from '@/db/db'
 import { generateId } from '@/lib/id'
 import { nowIso } from '@/lib/date'
+import { upsertProfileFromName } from './profiles'
 import type { Donation } from '@/types'
 import type { DonationInput } from '@/lib/validation'
 
@@ -35,6 +36,7 @@ export async function insertDonation(
     updatedAt: now,
   }
   await db.donations.add(donation)
+  await upsertProfileFromName('person', donation.donorName)
   return donation
 }
 
@@ -51,6 +53,7 @@ export async function updateDonation(id: string, input: DonationInput): Promise<
     unitId: input.type === 'commodity' ? input.unitId : undefined,
     updatedAt: nowIso(),
   })
+  await upsertProfileFromName('person', input.donorName)
 }
 
 export async function deleteDonation(id: string): Promise<void> {

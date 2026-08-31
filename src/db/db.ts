@@ -7,6 +7,7 @@ import type {
   ExpectedDonation,
   ExpectedExpense,
   Expense,
+  Profile,
   Unit,
   YearProfile,
 } from '@/types'
@@ -24,6 +25,7 @@ export class AppDatabase extends Dexie {
   auctions!: Table<Auction, string>
   categories!: Table<Category, string>
   units!: Table<Unit, string>
+  profiles!: Table<Profile, string>
   appSettings!: Table<AppSettings, string>
 
   constructor() {
@@ -48,6 +50,11 @@ export class AppDatabase extends Dexie {
       donations: 'id, yearProfileId, date, type, categoryId, donorName, unitId, [yearProfileId+date], [yearProfileId+type]',
       expectedDonations:
         'id, yearProfileId, date, type, status, categoryId, unitId, [yearProfileId+status], [yearProfileId+date]',
+    })
+    // v3: new `profiles` table (reusable Donor/Auction-participant/Vendor name registry) — only
+    // the new table needs declaring here, unchanged tables from v2 carry forward automatically.
+    this.version(3).stores({
+      profiles: 'id, kind, order',
     })
   }
 }

@@ -27,7 +27,7 @@ export async function getResetImpact(): Promise<ResetImpact> {
 export async function resetApplication(): Promise<YearProfile[]> {
   await db.transaction(
     'rw',
-    [db.yearProfiles, db.donations, db.expectedDonations, db.expenses, db.expectedExpenses, db.auctions, db.categories, db.units, db.appSettings],
+    [db.yearProfiles, db.donations, db.expectedDonations, db.expenses, db.expectedExpenses, db.auctions, db.categories, db.units, db.profiles, db.appSettings],
     async () => {
       await Promise.all([
         db.yearProfiles.clear(),
@@ -38,6 +38,7 @@ export async function resetApplication(): Promise<YearProfile[]> {
         db.auctions.clear(),
         db.categories.clear(),
         db.units.clear(),
+        db.profiles.clear(),
         db.appSettings.clear(),
       ])
     },

@@ -33,7 +33,7 @@ export async function insertYearProfile(
 
 export async function updateYearProfile(
   id: string,
-  patch: Partial<Pick<YearProfile, 'name' | 'status' | 'openingBalance'>>,
+  patch: Partial<Pick<YearProfile, 'name' | 'status' | 'openingBalance' | 'carryForward' | 'carryForwardSourceYearId'>>,
 ): Promise<void> {
   await db.yearProfiles.update(id, { ...patch, updatedAt: nowIso() })
 }

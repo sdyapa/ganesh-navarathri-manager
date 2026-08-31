@@ -1,10 +1,19 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { db } from '@/db/db'
 import { resetApplication } from '@/services/resetService'
-import { createYearProfile, getYearClosingBalance, deleteYear } from '@/services/yearService'
-import { convertExpectedDonationToDonation, moveExpectedExpenseToExpense } from '@/services/conversionService'
+import {
+  createYearProfile,
+  getYearClosingBalance,
+  deleteYear,
+  getOrCreateNextYearProfile,
+  applyCarryForwardOpeningBalance,
+  findMostRecentPriorYear,
+} from '@/services/yearService'
+import { getYearProfile } from '@/db/repositories/yearProfiles'
+import { convertExpectedDonationToDonation, moveExpectedExpenseToExpense, convertAuctionToExpectedDonation } from '@/services/conversionService'
 import { insertDonation, listDonationsForYear } from '@/db/repositories/donations'
 import { insertExpectedDonation, listExpectedDonationsForYear } from '@/db/repositories/expectedDonations'
+import { insertAuction, getAuction } from '@/db/repositories/auctions'
 import { insertExpense } from '@/db/repositories/expenses'
 import { insertExpectedExpense, listExpectedExpensesForYear } from '@/db/repositories/expectedExpenses'
 import {
@@ -15,6 +24,7 @@ import {
   restoreDefaultCategories,
 } from '@/db/repositories/categories'
 import { listUnits, setUnitActive, deleteUnit, isUnitInUse, restoreDefaultUnits } from '@/db/repositories/units'
+import { listProfiles, renameProfile, reorderProfiles, deleteProfile } from '@/db/repositories/profiles'
 import { exportYearBackup, exportFullBackup } from '@/services/backupExport'
 import { applyBackupImport, inspectBackupFile } from '@/services/backupImport'
 import {
@@ -146,6 +156,89 @@ describe('expected -> actual conversion', () => {
   })
 })
 
+describe('auction -> expected donation conversion', () => {
+  it('converts an auction win into a pending expected donation for next year and marks the auction converted', async () => {
+    const auctionCat = await categoryId('donation', 'Auction')
+    const year = await createYearProfile({ year: 3060, name: 'GN 3060', carryForward: false })
+
+    const auction = await insertAuction(year.id, {
+      item: 'Pedda Laddu',
+      person: 'Ramesh',
+      amount: 42000,
+      date: '3060-09-06',
+    })
+    expect(auction.convertedToExpectedDonationId).toBeUndefined()
+
+    const { profile: nextYear, created } = await getOrCreateNextYearProfile(year.id)
+    expect(created).toBe(true)
+    expect(nextYear.year).toBe(3061)
+
+    const pledge = await convertAuctionToExpectedDonation(auction.id, nextYear.id, {
+      donorName: 'Ramesh',
+      type: 'monetary',
+      amount: 42000,
+      date: '3061-08-20',
+      categoryId: auctionCat,
+    })
+
+    expect(pledge.sourceAuctionId).toBe(auction.id)
+    expect(pledge.status).toBe('pending')
+    expect(pledge.yearProfileId).toBe(nextYear.id)
+
+    const updatedAuction = await getAuction(auction.id)
+    expect(updatedAuction?.convertedToExpectedDonationId).toBe(pledge.id)
+  })
+
+  it('carries the source year’s closing balance forward when auto-creating next year, and reuses it if it already exists', async () => {
+    const chanda = await categoryId('donation', 'Chanda')
+    const year = await createYearProfile({ year: 3070, name: 'GN 3070', carryForward: false })
+    await insertDonation(year.id, { donorName: 'A', type: 'monetary', amount: 50000, date: '3070-08-20', categoryId: chanda })
+    expect(await getYearClosingBalance(year.id)).toBe(50000)
+
+    const first = await getOrCreateNextYearProfile(year.id)
+    expect(first.created).toBe(true)
+    expect(first.profile.year).toBe(3071)
+    expect(first.profile.openingBalance).toBe(50000)
+
+    const second = await getOrCreateNextYearProfile(year.id)
+    expect(second.created).toBe(false)
+    expect(second.profile.id).toBe(first.profile.id)
+
+    const allYears = await listYearProfiles()
+    expect(allYears.filter((y) => y.year === 3071)).toHaveLength(1)
+  })
+})
+
+describe('retroactive carry-forward into an existing year', () => {
+  it('pulls a prior year\'s closing balance into a year that already exists, without touching its records', async () => {
+    const chanda = await categoryId('donation', 'Chanda')
+    // Year B is created FIRST (opening balance 0) — mirrors the real scenario: the current
+    // year already existed before an older year was imported afterward via a backup file.
+    const yearB = await createYearProfile({ year: 3081, name: 'GN 3081', carryForward: false })
+    await insertDonation(yearB.id, { donorName: 'X', type: 'monetary', amount: 1000, date: '3081-08-20', categoryId: chanda })
+
+    const yearA = await createYearProfile({ year: 3080, name: 'GN 3080', carryForward: false })
+    await insertDonation(yearA.id, { donorName: 'A', type: 'monetary', amount: 90000, date: '3080-08-20', categoryId: chanda })
+    expect(await getYearClosingBalance(yearA.id)).toBe(90000)
+    expect(yearB.openingBalance).toBe(0)
+
+    const years = await listYearProfiles()
+    const source = findMostRecentPriorYear(years, yearB.year)
+    expect(source?.id).toBe(yearA.id)
+
+    const newBalance = await getYearClosingBalance(source!.id)
+    await applyCarryForwardOpeningBalance(yearB.id, yearA.id, newBalance)
+
+    const updatedB = await getYearProfile(yearB.id)
+    expect(updatedB?.openingBalance).toBe(90000)
+    expect(updatedB?.carryForwardSourceYearId).toBe(yearA.id)
+    expect(updatedB?.carryForward).toBe(true)
+    // The donation already in year B must survive untouched.
+    expect(await listDonationsForYear(yearB.id)).toHaveLength(1)
+    expect(await getYearClosingBalance(yearB.id)).toBe(90000 + 1000)
+  })
+})
+
 describe('category lifecycle', () => {
   it('deactivates rather than deletes a category still referenced by historical records', async () => {
     const chanda = await categoryId('donation', 'Chanda')
@@ -226,6 +319,82 @@ describe('backup export/import round trip', () => {
     expect(result.inserted.donations).toBe(0)
     expect(result.skippedDuplicates).toBe(1)
     expect(await listDonationsForYear(year.id)).toHaveLength(1)
+  })
+})
+
+describe('reusable profiles (People & Vendors)', () => {
+  it('auto-registers a new donor name as a Profile, and does not duplicate it on repeat or different-case use', async () => {
+    const chanda = await categoryId('donation', 'Chanda')
+    const year = await createYearProfile({ year: 3090, name: 'GN 3090', carryForward: false })
+
+    await insertDonation(year.id, { donorName: 'Venkatesh', type: 'monetary', amount: 500, date: '3090-08-20', categoryId: chanda })
+    let people = await listProfiles('person')
+    expect(people.filter((p) => p.name === 'Venkatesh')).toHaveLength(1)
+
+    // Same name again, different case — must not create a second entry.
+    await insertDonation(year.id, { donorName: 'venkatesh', type: 'monetary', amount: 200, date: '3090-08-21', categoryId: chanda })
+    people = await listProfiles('person')
+    expect(people.filter((p) => p.name.toLowerCase() === 'venkatesh')).toHaveLength(1)
+  })
+
+  it('registers an auction participant and an expense vendor under the right kind', async () => {
+    const pooja = await categoryId('expense', 'Pooja Items')
+    const year = await createYearProfile({ year: 3091, name: 'GN 3091', carryForward: false })
+
+    await insertAuction(year.id, { item: 'Modak Basket', person: 'Deepa', amount: 3000, date: '3091-09-06' })
+    const people = await listProfiles('person')
+    expect(people.some((p) => p.name === 'Deepa')).toBe(true)
+
+    await insertExpense(year.id, { description: 'Flowers', amount: 500, date: '3091-08-20', categoryId: pooja, vendorName: 'Sri Flower Mart' })
+    const vendors = await listProfiles('vendor')
+    expect(vendors.some((v) => v.name === 'Sri Flower Mart')).toBe(true)
+    // Vendor names must never leak into the person list.
+    expect((await listProfiles('person')).some((p) => p.name === 'Sri Flower Mart')).toBe(false)
+  })
+
+  it('supports rename, reorder, and delete — delete is always safe since nothing references a Profile by id', async () => {
+    const chanda = await categoryId('donation', 'Chanda')
+    const year = await createYearProfile({ year: 3092, name: 'GN 3092', carryForward: false })
+    await insertDonation(year.id, { donorName: 'Alpha', type: 'monetary', amount: 100, date: '3092-08-20', categoryId: chanda })
+    await insertDonation(year.id, { donorName: 'Beta', type: 'monetary', amount: 100, date: '3092-08-20', categoryId: chanda })
+
+    const before = await listProfiles('person')
+    const alpha = before.find((p) => p.name === 'Alpha')!
+    const beta = before.find((p) => p.name === 'Beta')!
+
+    await renameProfile(alpha.id, 'Alpha Renamed')
+    expect((await listProfiles('person')).some((p) => p.name === 'Alpha Renamed')).toBe(true)
+
+    await reorderProfiles([beta.id, alpha.id])
+    const reordered = await listProfiles('person')
+    expect(reordered[0].id).toBe(beta.id)
+    expect(reordered[1].id).toBe(alpha.id)
+
+    await deleteProfile(alpha.id)
+    expect((await listProfiles('person')).some((p) => p.id === alpha.id)).toBe(false)
+    // The donation itself is untouched — Profile deletion never cascades.
+    const donations = await listDonationsForYear(year.id)
+    expect(donations.some((d) => d.donorName === 'Alpha')).toBe(true)
+  })
+
+  it('round-trips profiles through a full backup export/import', async () => {
+    const chanda = await categoryId('donation', 'Chanda')
+    const year = await createYearProfile({ year: 3093, name: 'GN 3093', carryForward: false })
+    await insertDonation(year.id, { donorName: 'Kavitha', type: 'monetary', amount: 100, date: '3093-08-20', categoryId: chanda })
+    expect((await listProfiles('person')).some((p) => p.name === 'Kavitha')).toBe(true)
+
+    const backup = await exportFullBackup()
+    expect(backup.settings.profiles.some((p) => p.name === 'Kavitha')).toBe(true)
+
+    await resetApplication()
+    expect(await listProfiles('person')).toHaveLength(0)
+
+    const inspection = await inspectBackupFile(backup)
+    expect(inspection.valid).toBe(true)
+    if (!inspection.valid) return
+    expect(inspection.summary.profileCount).toBeGreaterThan(0)
+    await applyBackupImport(inspection.backup, 'add-new')
+    expect((await listProfiles('person')).some((p) => p.name === 'Kavitha')).toBe(true)
   })
 })
 

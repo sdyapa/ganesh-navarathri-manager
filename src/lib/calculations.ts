@@ -3,10 +3,14 @@
 // dashboard, reports, and PDF/PNG exports.
 //
 // Hard rules (do not relax these — see spec "Data Integrity Rules"):
-//   1. Actual closing balance = opening + actual monetary donations + auction proceeds - actual expenses.
+//   1. Actual closing balance = opening + actual monetary donations - actual expenses.
 //   2. Expected donations/expenses NEVER affect the actual balance, only once converted/moved.
 //   3. Commodity donations are never treated as cash.
-//   4. Auction proceeds are tracked separately from monetary donations.
+//   4. Auction proceeds are NEVER treated as cash either, and for the same reason: an auction
+//      win is a pledge, not money in hand — the winner pays the following year's festival (see
+//      conversionService's convertAuctionToExpectedDonation). totalAuctionProceeds is still
+//      computed and reported for visibility, it's just excluded from closingBalance/net cash
+//      flow until the pledge is actually converted and collected as a real Donation.
 import type {
   Auction,
   Category,
@@ -41,7 +45,8 @@ export function computeFinancialSummary(input: SummaryInput): FinancialSummary {
   const totalMonetaryDonations = sum(monetaryDonations.map((d) => d.amount))
   const totalAuctionProceeds = sum(auctions.map((a) => a.amount))
   const totalExpenses = sum(expenses.map((e) => e.amount))
-  const closingBalance = openingBalance + totalMonetaryDonations + totalAuctionProceeds - totalExpenses
+  // Auction proceeds are deliberately excluded — see the "Hard rules" comment above.
+  const closingBalance = openingBalance + totalMonetaryDonations - totalExpenses
 
   const pendingExpectedDonations = expectedDonations.filter((d) => d.status === 'pending')
   const pendingExpectedExpenses = expectedExpenses.filter((e) => e.status === 'pending')
@@ -183,7 +188,9 @@ export function computeDailyTrend(
 
   const points = Array.from(byDate.values()).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
   for (const p of points) {
-    p.net = p.donations + p.auctions - p.expenses
+    // Auction proceeds excluded from net cash flow for the same reason as closingBalance
+    // above — a win isn't cash until collected the following year.
+    p.net = p.donations - p.expenses
   }
   return points
 }

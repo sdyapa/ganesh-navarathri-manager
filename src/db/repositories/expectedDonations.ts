@@ -1,6 +1,7 @@
 import { db } from '@/db/db'
 import { generateId } from '@/lib/id'
 import { nowIso } from '@/lib/date'
+import { upsertProfileFromName } from './profiles'
 import type { ExpectedDonation } from '@/types'
 import type { ExpectedDonationInput } from '@/lib/validation'
 
@@ -15,6 +16,7 @@ export async function getExpectedDonation(id: string): Promise<ExpectedDonation 
 export async function insertExpectedDonation(
   yearProfileId: string,
   input: ExpectedDonationInput,
+  sourceAuctionId?: string | null,
 ): Promise<ExpectedDonation> {
   const now = nowIso()
   const record: ExpectedDonation = {
@@ -31,10 +33,12 @@ export async function insertExpectedDonation(
     unitId: input.type === 'commodity' ? input.unitId : undefined,
     status: 'pending',
     convertedDonationId: null,
+    sourceAuctionId: sourceAuctionId ?? null,
     createdAt: now,
     updatedAt: now,
   }
   await db.expectedDonations.add(record)
+  await upsertProfileFromName('person', record.donorName)
   return record
 }
 
@@ -51,6 +55,7 @@ export async function updateExpectedDonation(id: string, input: ExpectedDonation
     unitId: input.type === 'commodity' ? input.unitId : undefined,
     updatedAt: nowIso(),
   })
+  await upsertProfileFromName('person', input.donorName)
 }
 
 export async function deleteExpectedDonation(id: string): Promise<void> {

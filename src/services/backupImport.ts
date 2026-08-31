@@ -11,6 +11,7 @@ import type {
   ExpectedDonation,
   ExpectedExpense,
   Expense,
+  Profile,
   Unit,
   YearProfile,
 } from '@/types'
@@ -20,6 +21,7 @@ import { nowIso } from '@/lib/date'
 import { listYearProfiles } from '@/db/repositories/yearProfiles'
 import { listCategories } from '@/db/repositories/categories'
 import { listUnits } from '@/db/repositories/units'
+import { upsertProfileFromName } from '@/db/repositories/profiles'
 import { getAppSettings } from '@/db/repositories/settings'
 
 export type ImportMode = 'add-new' | 'skip-duplicates' | 'replace-year' | 'replace-all'
@@ -50,6 +52,7 @@ export interface BackupSummary {
   }
   categoryCount: number
   unitCount: number
+  profileCount: number
   existingLocalYears: number[]
 }
 
@@ -103,6 +106,7 @@ export async function inspectBackupFile(raw: unknown): Promise<BackupInspection>
     ),
     categoryCount: parsed.settings.categories.length,
     unitCount: parsed.settings.units.length,
+    profileCount: parsed.settings.profiles.length,
     existingLocalYears: localProfiles.map((p) => p.year),
   }
 
@@ -183,7 +187,7 @@ export async function applyBackupImport(backup: ParsedBackupFile, mode: ImportMo
     const currentSettings = await getAppSettings()
     await db.transaction(
       'rw',
-      [db.yearProfiles, db.donations, db.expectedDonations, db.expenses, db.expectedExpenses, db.auctions, db.categories, db.units, db.appSettings],
+      [db.yearProfiles, db.donations, db.expectedDonations, db.expenses, db.expectedExpenses, db.auctions, db.categories, db.units, db.profiles, db.appSettings],
       async () => {
         await Promise.all([
           db.yearProfiles.clear(),
@@ -194,9 +198,11 @@ export async function applyBackupImport(backup: ParsedBackupFile, mode: ImportMo
           db.auctions.clear(),
           db.categories.clear(),
           db.units.clear(),
+          db.profiles.clear(),
         ])
         await db.categories.bulkAdd(backup.settings.categories as Category[])
         await db.units.bulkAdd(backup.settings.units as Unit[])
+        await db.profiles.bulkAdd(backup.settings.profiles as Profile[])
         await db.appSettings.put({
           id: 'global',
           displayName: backup.settings.appSettings?.displayName?.trim() || currentSettings.displayName,
@@ -234,9 +240,16 @@ export async function applyBackupImport(backup: ParsedBackupFile, mode: ImportMo
 
   await db.transaction(
     'rw',
-    [db.yearProfiles, db.donations, db.expectedDonations, db.expenses, db.expectedExpenses, db.auctions, db.categories, db.units],
+    [db.yearProfiles, db.donations, db.expectedDonations, db.expenses, db.expectedExpenses, db.auctions, db.categories, db.units, db.profiles],
     async () => {
       const localProfiles = await listYearProfiles()
+
+      // Profiles have no foreign-key relationship from any other record (see the Profile
+      // type's doc comment), so — unlike categories/units — merging them in is just a
+      // case-insensitive upsert by name, no id-remapping resolver needed.
+      for (const p of backup.settings.profiles) {
+        await upsertProfileFromName(p.kind, p.name)
+      }
 
       for (const bundle of backup.years) {
         let targetYearId: string

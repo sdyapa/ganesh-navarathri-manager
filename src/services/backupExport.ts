@@ -9,6 +9,7 @@ import { listAuctionsForYear } from '@/db/repositories/auctions'
 import { getYearProfile, listYearProfiles } from '@/db/repositories/yearProfiles'
 import { listCategories } from '@/db/repositories/categories'
 import { listUnits } from '@/db/repositories/units'
+import { listProfiles } from '@/db/repositories/profiles'
 import { getAppSettings } from '@/db/repositories/settings'
 import { nowIso } from '@/lib/date'
 
@@ -26,14 +27,16 @@ async function buildYearBundle(yearProfileId: string): Promise<YearProfileBundle
 }
 
 async function buildSettingsBlock() {
-  const [categories, units, appSettings] = await Promise.all([
+  const [categories, units, profiles, appSettings] = await Promise.all([
     listCategories(),
     listUnits(),
+    listProfiles(),
     getAppSettings(),
   ])
   return {
     categories,
     units,
+    profiles,
     appSettings: {
       displayName: appSettings.displayName,
       whatsappTemplates: appSettings.whatsappTemplates,

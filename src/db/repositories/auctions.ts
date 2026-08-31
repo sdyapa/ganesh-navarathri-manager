@@ -1,6 +1,7 @@
 import { db } from '@/db/db'
 import { generateId } from '@/lib/id'
 import { nowIso } from '@/lib/date'
+import { upsertProfileFromName } from './profiles'
 import type { Auction } from '@/types'
 import type { AuctionInput } from '@/lib/validation'
 
@@ -26,6 +27,7 @@ export async function insertAuction(yearProfileId: string, input: AuctionInput):
     updatedAt: now,
   }
   await db.auctions.add(auction)
+  await upsertProfileFromName('person', auction.person)
   return auction
 }
 
@@ -38,8 +40,16 @@ export async function updateAuction(id: string, input: AuctionInput): Promise<vo
     notes: input.notes?.trim() || undefined,
     updatedAt: nowIso(),
   })
+  await upsertProfileFromName('person', input.person)
 }
 
 export async function deleteAuction(id: string): Promise<void> {
   await db.auctions.delete(id)
+}
+
+export async function markAuctionConverted(id: string, expectedDonationId: string): Promise<void> {
+  await db.auctions.update(id, {
+    convertedToExpectedDonationId: expectedDonationId,
+    updatedAt: nowIso(),
+  })
 }

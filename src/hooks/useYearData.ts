@@ -59,6 +59,14 @@ export function useUnits() {
   }, [], undefined)
 }
 
+export function useProfiles(kind?: 'person' | 'vendor') {
+  return useLiveQuery(async () => {
+    const all = await db.profiles.toArray()
+    const filtered = kind ? all.filter((p) => p.kind === kind) : all
+    return filtered.sort((a, b) => a.order - b.order)
+  }, [kind], undefined)
+}
+
 export function useAppSettings() {
   return useLiveQuery(
     async () => {
