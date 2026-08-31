@@ -569,6 +569,79 @@ describe('reusable profiles (People & Vendors)', () => {
     const vendors = await listProfiles('vendor')
     expect(vendors.some((v) => v.name === 'Legacy Vendor')).toBe(true)
   })
+
+  it('registers profiles from a backup with NO explicit profiles list even under "replace entire database" mode', async () => {
+    // Regression test: replace-all used to seed db.profiles via a plain bulkAdd of
+    // backup.settings.profiles ONLY — a backup with no explicit profiles list (like the actual
+    // 2025 legacy Excel-migration file the user imports) silently ended up with an EMPTY
+    // People & Vendors list under this mode, even though every other import mode derived
+    // profiles from each record's own name as it was inserted.
+    const now = new Date().toISOString()
+    const legacyStyleBackup = {
+      appName: 'Ganesh Navarathri Manager',
+      backupVersion: 1,
+      exportType: 'full' as const,
+      exportedAt: now,
+      years: [
+        {
+          profile: {
+            id: 'legacy-year-2',
+            year: 3098,
+            name: 'GN 3098 (Legacy)',
+            openingBalance: 0,
+            carryForward: false,
+            status: 'active' as const,
+            createdAt: now,
+            updatedAt: now,
+          },
+          donations: [
+            {
+              id: 'legacy-d2',
+              yearProfileId: 'legacy-year-2',
+              donorName: 'Replace-All Donor',
+              type: 'monetary' as const,
+              date: '3098-08-20',
+              categoryId: await categoryId('donation', 'Chanda'),
+              amount: 1000,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ],
+          expectedDonations: [],
+          expenses: [
+            {
+              id: 'legacy-e2',
+              yearProfileId: 'legacy-year-2',
+              description: 'Legacy expense',
+              amount: 200,
+              date: '3098-08-20',
+              categoryId: await categoryId('expense', 'Pooja Items'),
+              vendorName: 'Replace-All Vendor',
+              createdAt: now,
+              updatedAt: now,
+            },
+          ],
+          expectedExpenses: [],
+          auctions: [
+            { id: 'legacy-a2', yearProfileId: 'legacy-year-2', item: 'Basket', person: 'Replace-All Bidder', amount: 300, date: '3098-09-06', createdAt: now, updatedAt: now },
+          ],
+        },
+      ],
+      settings: { categories: [], units: [] }, // no `profiles` key at all
+    }
+
+    const inspection = await inspectBackupFile(legacyStyleBackup)
+    expect(inspection.valid).toBe(true)
+    if (!inspection.valid) return
+
+    await applyBackupImport(inspection.backup, 'replace-all')
+
+    const people = await listProfiles('person')
+    expect(people.some((p) => p.name === 'Replace-All Donor')).toBe(true)
+    expect(people.some((p) => p.name === 'Replace-All Bidder')).toBe(true)
+    const vendors = await listProfiles('vendor')
+    expect(vendors.some((v) => v.name === 'Replace-All Vendor')).toBe(true)
+  })
 })
 
 describe('copy Actual records forward to Expected (recurring items)', () => {

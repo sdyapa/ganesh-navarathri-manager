@@ -293,6 +293,17 @@ export async function applyBackupImport(backup: ParsedBackupFile, mode: ImportMo
           result.inserted.tasks += bundle.tasks.length
           result.inserted.keyEvents += bundle.keyEvents.length
           result.inserted.poojaAssignments += bundle.poojaAssignments.length
+
+          // db.profiles.bulkAdd above only seeded whatever the backup listed *explicitly* in
+          // settings.profiles — a backup exported before Profiles existed (or hand-built, like
+          // a spreadsheet migration) has none. Every other import mode derives a Profile from
+          // each record's own name as it's inserted (see the merge-mode loop below); replace-all
+          // must do the same instead of silently ending up with an empty People & Vendors list.
+          for (const d of bundle.donations) await upsertProfileFromName('person', d.donorName)
+          for (const d of bundle.expectedDonations) await upsertProfileFromName('person', d.donorName)
+          for (const e of bundle.expenses) await upsertProfileFromName('vendor', e.vendorName)
+          for (const e of bundle.expectedExpenses) await upsertProfileFromName('vendor', e.vendorName)
+          for (const a of bundle.auctions) await upsertProfileFromName('person', a.person)
         }
       },
     )
