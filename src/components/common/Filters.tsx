@@ -56,6 +56,33 @@ export function SelectFilter({
   )
 }
 
+/** A single dropdown combining sort field + direction into one choice (e.g. "Date (Newest
+ *  first)") rather than two separate controls — simpler to use for a list this size. `value`
+ *  is expected to be "<field>-<asc|desc>" so callers can split it straight into the args for
+ *  tableUtils.ts's sortByKey. */
+export function SortControl({
+  value,
+  onChange,
+  options,
+}: {
+  value: string
+  onChange: (value: string) => void
+  options: Array<{ value: string; label: string }>
+}) {
+  return (
+    <div className="filter-field">
+      <label htmlFor="sort-control">Sort by</label>
+      <select id="sort-control" value={value} onChange={(e) => onChange(e.target.value)}>
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
 export function DateRangeFilter({
   from,
   to,

@@ -157,6 +157,7 @@ ul { list-style: none; margin: 0; padding: 0; }
 }
 .bottom-nav__link {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -164,10 +165,13 @@ ul { list-style: none; margin: 0; padding: 0; }
   gap: 2px;
   text-decoration: none;
   color: var(--color-text-muted);
-  font-size: 0.68rem;
-  padding: var(--space-1) 0;
+  font-size: 0.62rem;
+  padding: var(--space-1) 2px;
 }
-.bottom-nav__icon { font-size: 1.25rem; }
+/* 8 items on a narrow phone leaves little room per label — clip rather than wrap so a long
+   label (e.g. "Dashboard") never pushes the icon out of its row. */
+.bottom-nav__label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bottom-nav__icon { font-size: 1.1rem; }
 .bottom-nav__link--active { color: var(--color-primary); font-weight: 600; }
 
 @media (min-width: 900px) {
@@ -393,6 +397,7 @@ ul { list-style: none; margin: 0; padding: 0; }
 .data-table td:nth-child(6), .data-table th:nth-child(6) { white-space: normal; min-width: 160px; }
 .data-table thead th { background: var(--color-primary-light); color: var(--color-primary-dark); position: sticky; top: 0; }
 .data-table tbody tr:last-child td { border-bottom: none; }
+.data-table__select-col { width: 1%; white-space: nowrap; }
 .text-right { text-align: right; }
 
 .table-responsive--desktop { display: none; }
@@ -409,9 +414,17 @@ ul { list-style: none; margin: 0; padding: 0; }
   gap: 6px;
 }
 .record-card__top { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2); }
+.record-card__select { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--color-text-muted); }
 .record-card__amount { font-size: 1.1rem; font-weight: 700; }
 .record-card__meta { color: var(--color-text-muted); font-size: 0.85rem; }
 .record-card__notes { font-size: 0.85rem; color: var(--color-text); background: var(--color-muted-bg); padding: 6px 8px; border-radius: var(--radius-sm); }
+.record-card__group-row { display: flex; justify-content: space-between; gap: var(--space-2); }
+.checklist-item--done { text-decoration: line-through; color: var(--color-text-muted); }
+
+/* Same card look as .record-cards--mobile, but visible at every width — for list views (Tasks,
+   the "Group by Payment Group" view) that render only cards with no separate desktop table, so
+   they must not inherit record-cards--mobile's `display: none` above 760px. */
+.card-list { display: flex; flex-direction: column; gap: var(--space-3); }
 
 @media (min-width: 760px) {
   .table-responsive--desktop { display: block; }

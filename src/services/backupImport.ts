@@ -11,7 +11,10 @@ import type {
   ExpectedDonation,
   ExpectedExpense,
   Expense,
+  KeyEvent,
+  PoojaAssignment,
   Profile,
+  Task,
   Unit,
   YearProfile,
 } from '@/types'
@@ -42,6 +45,9 @@ export interface BackupSummary {
     expenses: number
     expectedExpenses: number
     auctions: number
+    tasks: number
+    keyEvents: number
+    poojaAssignments: number
   }>
   totals: {
     donations: number
@@ -49,6 +55,9 @@ export interface BackupSummary {
     expenses: number
     expectedExpenses: number
     auctions: number
+    tasks: number
+    keyEvents: number
+    poojaAssignments: number
   }
   categoryCount: number
   unitCount: number
@@ -93,6 +102,9 @@ export async function inspectBackupFile(raw: unknown): Promise<BackupInspection>
       expenses: y.expenses.length,
       expectedExpenses: y.expectedExpenses.length,
       auctions: y.auctions.length,
+      tasks: y.tasks.length,
+      keyEvents: y.keyEvents.length,
+      poojaAssignments: y.poojaAssignments.length,
     })),
     totals: parsed.years.reduce(
       (acc, y) => ({
@@ -101,8 +113,11 @@ export async function inspectBackupFile(raw: unknown): Promise<BackupInspection>
         expenses: acc.expenses + y.expenses.length,
         expectedExpenses: acc.expectedExpenses + y.expectedExpenses.length,
         auctions: acc.auctions + y.auctions.length,
+        tasks: acc.tasks + y.tasks.length,
+        keyEvents: acc.keyEvents + y.keyEvents.length,
+        poojaAssignments: acc.poojaAssignments + y.poojaAssignments.length,
       }),
-      { donations: 0, expectedDonations: 0, expenses: 0, expectedExpenses: 0, auctions: 0 },
+      { donations: 0, expectedDonations: 0, expenses: 0, expectedExpenses: 0, auctions: 0, tasks: 0, keyEvents: 0, poojaAssignments: 0 },
     ),
     categoryCount: parsed.settings.categories.length,
     unitCount: parsed.settings.units.length,
@@ -116,7 +131,16 @@ export async function inspectBackupFile(raw: unknown): Promise<BackupInspection>
 export interface ImportResult {
   yearsCreated: number
   yearsMergedInto: number
-  inserted: { donations: number; expectedDonations: number; expenses: number; expectedExpenses: number; auctions: number }
+  inserted: {
+    donations: number
+    expectedDonations: number
+    expenses: number
+    expectedExpenses: number
+    auctions: number
+    tasks: number
+    keyEvents: number
+    poojaAssignments: number
+  }
   skippedDuplicates: number
 }
 
@@ -124,7 +148,16 @@ function emptyResult(): ImportResult {
   return {
     yearsCreated: 0,
     yearsMergedInto: 0,
-    inserted: { donations: 0, expectedDonations: 0, expenses: 0, expectedExpenses: 0, auctions: 0 },
+    inserted: {
+      donations: 0,
+      expectedDonations: 0,
+      expenses: 0,
+      expectedExpenses: 0,
+      auctions: 0,
+      tasks: 0,
+      keyEvents: 0,
+      poojaAssignments: 0,
+    },
     skippedDuplicates: 0,
   }
 }
@@ -173,6 +206,15 @@ function expenseKey(e: Pick<Expense, 'description' | 'date' | 'amount'>): string
 function auctionKey(a: Pick<Auction, 'item' | 'person' | 'date' | 'amount'>): string {
   return [a.item.trim().toLowerCase(), a.person.trim().toLowerCase(), a.date, a.amount].join('|')
 }
+function taskKey(t: Pick<Task, 'title' | 'dueDate'>): string {
+  return [t.title.trim().toLowerCase(), t.dueDate].join('|')
+}
+function keyEventKey(k: Pick<KeyEvent, 'name' | 'date'>): string {
+  return [k.name.trim().toLowerCase(), k.date].join('|')
+}
+function poojaAssignmentKey(p: Pick<PoojaAssignment, 'date' | 'familyNames'>): string {
+  return [p.date, p.familyNames.trim().toLowerCase()].join('|')
+}
 
 /** Applies a validated backup according to the chosen conflict-resolution mode. Always runs
  *  inside a single transaction so a mid-import failure can't leave the database half-written. */
@@ -187,7 +229,21 @@ export async function applyBackupImport(backup: ParsedBackupFile, mode: ImportMo
     const currentSettings = await getAppSettings()
     await db.transaction(
       'rw',
-      [db.yearProfiles, db.donations, db.expectedDonations, db.expenses, db.expectedExpenses, db.auctions, db.categories, db.units, db.profiles, db.appSettings],
+      [
+        db.yearProfiles,
+        db.donations,
+        db.expectedDonations,
+        db.expenses,
+        db.expectedExpenses,
+        db.auctions,
+        db.categories,
+        db.units,
+        db.profiles,
+        db.tasks,
+        db.keyEvents,
+        db.poojaAssignments,
+        db.appSettings,
+      ],
       async () => {
         await Promise.all([
           db.yearProfiles.clear(),
@@ -199,6 +255,9 @@ export async function applyBackupImport(backup: ParsedBackupFile, mode: ImportMo
           db.categories.clear(),
           db.units.clear(),
           db.profiles.clear(),
+          db.tasks.clear(),
+          db.keyEvents.clear(),
+          db.poojaAssignments.clear(),
         ])
         await db.categories.bulkAdd(backup.settings.categories as Category[])
         await db.units.bulkAdd(backup.settings.units as Unit[])
@@ -222,12 +281,18 @@ export async function applyBackupImport(backup: ParsedBackupFile, mode: ImportMo
           await db.expenses.bulkAdd(bundle.expenses as Expense[])
           await db.expectedExpenses.bulkAdd(bundle.expectedExpenses as ExpectedExpense[])
           await db.auctions.bulkAdd(bundle.auctions as Auction[])
+          if (bundle.tasks.length) await db.tasks.bulkAdd(bundle.tasks as Task[])
+          if (bundle.keyEvents.length) await db.keyEvents.bulkAdd(bundle.keyEvents as KeyEvent[])
+          if (bundle.poojaAssignments.length) await db.poojaAssignments.bulkAdd(bundle.poojaAssignments as PoojaAssignment[])
           result.yearsCreated += 1
           result.inserted.donations += bundle.donations.length
           result.inserted.expectedDonations += bundle.expectedDonations.length
           result.inserted.expenses += bundle.expenses.length
           result.inserted.expectedExpenses += bundle.expectedExpenses.length
           result.inserted.auctions += bundle.auctions.length
+          result.inserted.tasks += bundle.tasks.length
+          result.inserted.keyEvents += bundle.keyEvents.length
+          result.inserted.poojaAssignments += bundle.poojaAssignments.length
         }
       },
     )
@@ -240,7 +305,20 @@ export async function applyBackupImport(backup: ParsedBackupFile, mode: ImportMo
 
   await db.transaction(
     'rw',
-    [db.yearProfiles, db.donations, db.expectedDonations, db.expenses, db.expectedExpenses, db.auctions, db.categories, db.units, db.profiles],
+    [
+      db.yearProfiles,
+      db.donations,
+      db.expectedDonations,
+      db.expenses,
+      db.expectedExpenses,
+      db.auctions,
+      db.categories,
+      db.units,
+      db.profiles,
+      db.tasks,
+      db.keyEvents,
+      db.poojaAssignments,
+    ],
     async () => {
       const localProfiles = await listYearProfiles()
 
@@ -262,6 +340,9 @@ export async function applyBackupImport(backup: ParsedBackupFile, mode: ImportMo
             await db.expenses.where('yearProfileId').equals(localExisting.id).delete()
             await db.expectedExpenses.where('yearProfileId').equals(localExisting.id).delete()
             await db.auctions.where('yearProfileId').equals(localExisting.id).delete()
+            await db.tasks.where('yearProfileId').equals(localExisting.id).delete()
+            await db.keyEvents.where('yearProfileId').equals(localExisting.id).delete()
+            await db.poojaAssignments.where('yearProfileId').equals(localExisting.id).delete()
             targetYearId = localExisting.id
             await db.yearProfiles.update(targetYearId, {
               name: bundle.profile.name,
@@ -304,6 +385,15 @@ export async function applyBackupImport(backup: ParsedBackupFile, mode: ImportMo
         const existingAuctionKeys = dedupe
           ? new Set((await db.auctions.where('yearProfileId').equals(targetYearId).toArray()).map(auctionKey))
           : null
+        const existingTaskKeys = dedupe
+          ? new Set((await db.tasks.where('yearProfileId').equals(targetYearId).toArray()).map(taskKey))
+          : null
+        const existingKeyEventKeys = dedupe
+          ? new Set((await db.keyEvents.where('yearProfileId').equals(targetYearId).toArray()).map(keyEventKey))
+          : null
+        const existingPoojaAssignmentKeys = dedupe
+          ? new Set((await db.poojaAssignments.where('yearProfileId').equals(targetYearId).toArray()).map(poojaAssignmentKey))
+          : null
 
         for (const d of bundle.donations) {
           const cat = backupCategoryNameById.get(d.categoryId)
@@ -322,6 +412,7 @@ export async function applyBackupImport(backup: ParsedBackupFile, mode: ImportMo
             continue
           }
           await db.donations.add(record)
+          await upsertProfileFromName('person', record.donorName)
           result.inserted.donations += 1
         }
 
@@ -342,6 +433,7 @@ export async function applyBackupImport(backup: ParsedBackupFile, mode: ImportMo
             continue
           }
           await db.expectedDonations.add(record)
+          await upsertProfileFromName('person', record.donorName)
           result.inserted.expectedDonations += 1
         }
 
@@ -359,6 +451,7 @@ export async function applyBackupImport(backup: ParsedBackupFile, mode: ImportMo
             continue
           }
           await db.expenses.add(record)
+          await upsertProfileFromName('vendor', record.vendorName)
           result.inserted.expenses += 1
         }
 
@@ -376,6 +469,7 @@ export async function applyBackupImport(backup: ParsedBackupFile, mode: ImportMo
             continue
           }
           await db.expectedExpenses.add(record)
+          await upsertProfileFromName('vendor', record.vendorName)
           result.inserted.expectedExpenses += 1
         }
 
@@ -390,7 +484,50 @@ export async function applyBackupImport(backup: ParsedBackupFile, mode: ImportMo
             continue
           }
           await db.auctions.add(record)
+          await upsertProfileFromName('person', record.person)
           result.inserted.auctions += 1
+        }
+
+        for (const t of bundle.tasks) {
+          const record: Task = {
+            ...(t as Task),
+            id: mode === 'replace-year' ? t.id : generateId(),
+            yearProfileId: targetYearId,
+          }
+          if (existingTaskKeys?.has(taskKey(record))) {
+            result.skippedDuplicates += 1
+            continue
+          }
+          await db.tasks.add(record)
+          result.inserted.tasks += 1
+        }
+
+        for (const k of bundle.keyEvents) {
+          const record: KeyEvent = {
+            ...(k as KeyEvent),
+            id: mode === 'replace-year' ? k.id : generateId(),
+            yearProfileId: targetYearId,
+          }
+          if (existingKeyEventKeys?.has(keyEventKey(record))) {
+            result.skippedDuplicates += 1
+            continue
+          }
+          await db.keyEvents.add(record)
+          result.inserted.keyEvents += 1
+        }
+
+        for (const p of bundle.poojaAssignments) {
+          const record: PoojaAssignment = {
+            ...(p as PoojaAssignment),
+            id: mode === 'replace-year' ? p.id : generateId(),
+            yearProfileId: targetYearId,
+          }
+          if (existingPoojaAssignmentKeys?.has(poojaAssignmentKey(record))) {
+            result.skippedDuplicates += 1
+            continue
+          }
+          await db.poojaAssignments.add(record)
+          result.inserted.poojaAssignments += 1
         }
       }
     },

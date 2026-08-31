@@ -62,6 +62,10 @@ export const expenseInputSchema = z.object({
   categoryId: nonEmpty('Category'),
   notes,
   vendorName: z.string().trim().max(100, 'Vendor name is too long').optional(),
+  // Visual-only grouping label (see Expense.paymentGroup's doc comment) — shared with
+  // expectedExpenseInputSchema below since it's the same underlying schema, but the Expected
+  // Expense form never renders this field, so it's simply never populated there.
+  paymentGroup: z.string().trim().max(100, 'Payment group name is too long').optional(),
 })
 
 export type ExpenseInput = z.infer<typeof expenseInputSchema>
@@ -79,6 +83,33 @@ export const auctionInputSchema = z.object({
 })
 
 export type AuctionInput = z.infer<typeof auctionInputSchema>
+
+export const taskInputSchema = z.object({
+  title: nonEmpty('Title'),
+  dueDate: dateOnly,
+  notes,
+  // Only populated on create (parsed from the Add form's one-item-per-line textarea) — editing
+  // a task's title/date/notes never touches its checklist, which is managed item-by-item.
+  checklistItems: z.array(z.string()).optional().default([]),
+})
+
+export type TaskInput = z.infer<typeof taskInputSchema>
+
+export const keyEventInputSchema = z.object({
+  name: nonEmpty('Event name'),
+  date: dateOnly,
+  notes,
+})
+
+export type KeyEventInput = z.infer<typeof keyEventInputSchema>
+
+export const poojaAssignmentInputSchema = z.object({
+  date: dateOnly,
+  familyNames: nonEmpty('Family name(s)'),
+  notes,
+})
+
+export type PoojaAssignmentInput = z.infer<typeof poojaAssignmentInputSchema>
 
 export const categoryInputSchema = z.object({
   kind: z.enum(['donation', 'expense']),
@@ -161,6 +192,7 @@ export const backupExpenseSchema = recordBaseSchema
     notes: z.string().optional(),
     vendorName: z.string().optional(),
     sourceExpectedExpenseId: z.string().nullable().optional(),
+    paymentGroup: z.string().optional(),
   })
   .passthrough()
 
@@ -183,6 +215,52 @@ export const backupAuctionSchema = z
     createdAt: z.string(),
     updatedAt: z.string(),
     convertedToExpectedDonationId: z.string().nullable().optional(),
+  })
+  .passthrough()
+
+export const backupTaskChecklistItemSchema = z
+  .object({
+    id: z.string(),
+    label: z.string(),
+    done: z.boolean(),
+  })
+  .passthrough()
+
+export const backupTaskSchema = z
+  .object({
+    id: z.string(),
+    yearProfileId: z.string(),
+    title: z.string(),
+    dueDate: z.string(),
+    notes: z.string().optional(),
+    done: z.boolean(),
+    checklist: z.array(backupTaskChecklistItemSchema),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+  })
+  .passthrough()
+
+export const backupKeyEventSchema = z
+  .object({
+    id: z.string(),
+    yearProfileId: z.string(),
+    name: z.string(),
+    date: z.string(),
+    notes: z.string().optional(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+  })
+  .passthrough()
+
+export const backupPoojaAssignmentSchema = z
+  .object({
+    id: z.string(),
+    yearProfileId: z.string(),
+    date: z.string(),
+    familyNames: z.string(),
+    notes: z.string().optional(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
   })
   .passthrough()
 
@@ -238,6 +316,11 @@ export const backupYearBundleSchema = z
     expenses: z.array(backupExpenseSchema),
     expectedExpenses: z.array(backupExpectedExpenseSchema),
     auctions: z.array(backupAuctionSchema),
+    // .default([]) so a backup exported before this feature existed still validates — see the
+    // identical pattern for settings.profiles below.
+    tasks: z.array(backupTaskSchema).default([]),
+    keyEvents: z.array(backupKeyEventSchema).default([]),
+    poojaAssignments: z.array(backupPoojaAssignmentSchema).default([]),
   })
   .passthrough()
 

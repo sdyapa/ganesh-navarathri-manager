@@ -75,7 +75,15 @@ export function DataManagement() {
       const result = await applyBackupImport(inspection.backup, importMode)
       setInspection(null)
       if (fileInputRef.current) fileInputRef.current.value = ''
-      const total = result.inserted.donations + result.inserted.expenses + result.inserted.expectedDonations + result.inserted.expectedExpenses + result.inserted.auctions
+      const total =
+        result.inserted.donations +
+        result.inserted.expenses +
+        result.inserted.expectedDonations +
+        result.inserted.expectedExpenses +
+        result.inserted.auctions +
+        result.inserted.tasks +
+        result.inserted.keyEvents +
+        result.inserted.poojaAssignments
       showToast(
         `Import complete: ${total} record(s) added${result.skippedDuplicates ? `, ${result.skippedDuplicates} duplicate(s) skipped` : ''}.`,
       )
@@ -215,6 +223,9 @@ export function DataManagement() {
               { label: 'Expenses', value: String(inspection.summary.totals.expenses) },
               { label: 'Expected Expenses', value: String(inspection.summary.totals.expectedExpenses) },
               { label: 'Auctions', value: String(inspection.summary.totals.auctions) },
+              { label: 'Tasks', value: String(inspection.summary.totals.tasks) },
+              { label: 'Key Events', value: String(inspection.summary.totals.keyEvents) },
+              { label: 'Pooja Roster Entries', value: String(inspection.summary.totals.poojaAssignments) },
               { label: 'Categories Included', value: String(inspection.summary.categoryCount) },
               { label: 'Units Included', value: String(inspection.summary.unitCount) },
               { label: 'People/Vendors Included', value: String(inspection.summary.profileCount) },
@@ -286,6 +297,9 @@ export function DataManagement() {
                 { label: 'Expenses', value: String(resetImpact.expenses) },
                 { label: 'Expected Expenses', value: String(resetImpact.expectedExpenses) },
                 { label: 'Auctions', value: String(resetImpact.auctions) },
+                { label: 'Tasks', value: String(resetImpact.tasks) },
+                { label: 'Key Events', value: String(resetImpact.keyEvents) },
+                { label: 'Pooja Roster Entries', value: String(resetImpact.poojaAssignments) },
               ]}
             />
           }

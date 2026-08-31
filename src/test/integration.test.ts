@@ -10,12 +10,21 @@ import {
   findMostRecentPriorYear,
 } from '@/services/yearService'
 import { getYearProfile } from '@/db/repositories/yearProfiles'
-import { convertExpectedDonationToDonation, moveExpectedExpenseToExpense, convertAuctionToExpectedDonation } from '@/services/conversionService'
-import { insertDonation, listDonationsForYear } from '@/db/repositories/donations'
+import {
+  convertExpectedDonationToDonation,
+  moveExpectedExpenseToExpense,
+  convertAuctionToExpectedDonation,
+  revertDonationToExpected,
+  revertExpenseToExpected,
+} from '@/services/conversionService'
+import { insertDonation, listDonationsForYear, getDonation } from '@/db/repositories/donations'
 import { insertExpectedDonation, listExpectedDonationsForYear } from '@/db/repositories/expectedDonations'
 import { insertAuction, getAuction } from '@/db/repositories/auctions'
-import { insertExpense } from '@/db/repositories/expenses'
+import { insertExpense, getExpense } from '@/db/repositories/expenses'
 import { insertExpectedExpense, listExpectedExpensesForYear } from '@/db/repositories/expectedExpenses'
+import { insertTask, addChecklistItem, toggleChecklistItem, removeChecklistItem, setTaskDone, listTasksForYear } from '@/db/repositories/tasks'
+import { insertKeyEvent, listKeyEventsForYear } from '@/db/repositories/keyEvents'
+import { insertPoojaAssignment, listPoojaAssignmentsForYear } from '@/db/repositories/poojaAssignments'
 import {
   listCategories,
   isCategoryInUse,
@@ -25,6 +34,7 @@ import {
 } from '@/db/repositories/categories'
 import { listUnits, setUnitActive, deleteUnit, isUnitInUse, restoreDefaultUnits } from '@/db/repositories/units'
 import { listProfiles, renameProfile, reorderProfiles, deleteProfile } from '@/db/repositories/profiles'
+import { copyExpensesToExpected, copyDonationsToExpected } from '@/services/copyForwardService'
 import { exportYearBackup, exportFullBackup } from '@/services/backupExport'
 import { applyBackupImport, inspectBackupFile } from '@/services/backupImport'
 import {
@@ -153,6 +163,63 @@ describe('expected -> actual conversion', () => {
     const [updatedExpected] = await listExpectedExpensesForYear(year.id)
     expect(updatedExpected.status).toBe('converted')
     expect(await getYearClosingBalance(year.id)).toBe(-6000)
+  })
+})
+
+describe('undo a conversion (move back to Expected)', () => {
+  it('reverts a converted donation back to a pending expected donation, deleting the actual record', async () => {
+    const chanda = await categoryId('donation', 'Chanda')
+    const year = await createYearProfile({ year: 3052, name: 'GN 3052', carryForward: false })
+
+    const expected = await insertExpectedDonation(year.id, { donorName: 'Ramesh', type: 'monetary', amount: 10000, date: '3052-08-28', categoryId: chanda })
+    const donation = await convertExpectedDonationToDonation(expected.id, year.id, {
+      donorName: 'Ramesh',
+      type: 'monetary',
+      amount: 10000,
+      date: '3052-08-29',
+      categoryId: chanda,
+    })
+    expect(await getYearClosingBalance(year.id)).toBe(10000)
+
+    await revertDonationToExpected(donation)
+
+    expect(await getDonation(donation.id)).toBeUndefined()
+    const [reverted] = await listExpectedDonationsForYear(year.id)
+    expect(reverted.status).toBe('pending')
+    expect(reverted.convertedDonationId).toBeNull()
+    expect(await getYearClosingBalance(year.id)).toBe(0)
+  })
+
+  it('reverts a moved expense back to a pending expected expense, deleting the actual record', async () => {
+    const pooja = await categoryId('expense', 'Pooja Items')
+    const year = await createYearProfile({ year: 3053, name: 'GN 3053', carryForward: false })
+
+    const expected = await insertExpectedExpense(year.id, { description: 'Fireworks', amount: 6000, date: '3053-08-28', categoryId: pooja })
+    const expense = await moveExpectedExpenseToExpense(expected.id, year.id, {
+      description: 'Fireworks',
+      amount: 6000,
+      date: '3053-08-29',
+      categoryId: pooja,
+    })
+    expect(await getYearClosingBalance(year.id)).toBe(-6000)
+
+    await revertExpenseToExpected(expense)
+
+    expect(await getExpense(expense.id)).toBeUndefined()
+    const [reverted] = await listExpectedExpensesForYear(year.id)
+    expect(reverted.status).toBe('pending')
+    expect(reverted.convertedExpenseId).toBeNull()
+    expect(await getYearClosingBalance(year.id)).toBe(0)
+  })
+
+  it('is a no-op for a manually-entered actual record with no source Expected record', async () => {
+    const chanda = await categoryId('donation', 'Chanda')
+    const year = await createYearProfile({ year: 3054, name: 'GN 3054', carryForward: false })
+    const donation = await insertDonation(year.id, { donorName: 'Direct', type: 'monetary', amount: 500, date: '3054-08-20', categoryId: chanda })
+
+    await revertDonationToExpected(donation)
+
+    expect(await getDonation(donation.id)).toBeDefined()
   })
 })
 
@@ -372,9 +439,44 @@ describe('reusable profiles (People & Vendors)', () => {
 
     await deleteProfile(alpha.id)
     expect((await listProfiles('person')).some((p) => p.id === alpha.id)).toBe(false)
-    // The donation itself is untouched — Profile deletion never cascades.
+    // The donation record itself keeps whatever name it already has after a delete — deletion
+    // never cascades. (Rename, tested separately below, is the opposite: it must cascade.)
     const donations = await listDonationsForYear(year.id)
-    expect(donations.some((d) => d.donorName === 'Alpha')).toBe(true)
+    expect(donations.some((d) => d.donorName === 'Alpha Renamed')).toBe(true)
+  })
+
+  it('renaming a person Profile cascades to every donation/expected-donation/auction using the old name, across every year', async () => {
+    const chanda = await categoryId('donation', 'Chanda')
+    const yearA = await createYearProfile({ year: 3094, name: 'GN 3094', carryForward: false })
+    const yearB = await createYearProfile({ year: 3095, name: 'GN 3095', carryForward: false })
+
+    await insertDonation(yearA.id, { donorName: 'Ramu', type: 'monetary', amount: 500, date: '3094-08-20', categoryId: chanda })
+    await insertExpectedDonation(yearB.id, { donorName: 'ramu', type: 'monetary', amount: 600, date: '3095-08-20', categoryId: chanda })
+    await insertAuction(yearB.id, { item: 'Basket', person: 'Ramu', amount: 700, date: '3095-09-06' })
+
+    const ramu = (await listProfiles('person')).find((p) => p.name.toLowerCase() === 'ramu')!
+    await renameProfile(ramu.id, 'Ramu Kumar')
+
+    expect((await listDonationsForYear(yearA.id)).find((d) => d.donorName === 'Ramu')).toBeUndefined()
+    expect((await listDonationsForYear(yearA.id)).some((d) => d.donorName === 'Ramu Kumar')).toBe(true)
+    expect((await listExpectedDonationsForYear(yearB.id)).some((d) => d.donorName === 'Ramu Kumar')).toBe(true)
+    const auctionsInB = await db.auctions.where('yearProfileId').equals(yearB.id).toArray()
+    expect(auctionsInB.some((a) => a.person === 'Ramu Kumar')).toBe(true)
+  })
+
+  it('renaming a vendor Profile cascades to every expense/expected-expense using the old name', async () => {
+    const pooja = await categoryId('expense', 'Pooja Items')
+    const year = await createYearProfile({ year: 3096, name: 'GN 3096', carryForward: false })
+    await insertExpense(year.id, { description: 'Flowers', amount: 500, date: '3096-08-20', categoryId: pooja, vendorName: 'Sri Flower Mart' })
+    await insertExpectedExpense(year.id, { description: 'Flowers next year', amount: 550, date: '3096-08-21', categoryId: pooja, vendorName: 'Sri Flower Mart' })
+
+    const vendor = (await listProfiles('vendor')).find((v) => v.name === 'Sri Flower Mart')!
+    await renameProfile(vendor.id, 'Sri Flower Mart & Co')
+
+    const expenses = await db.expenses.where('yearProfileId').equals(year.id).toArray()
+    expect(expenses.every((e) => e.vendorName === 'Sri Flower Mart & Co')).toBe(true)
+    const expectedExpenses = await listExpectedExpensesForYear(year.id)
+    expect(expectedExpenses.every((e) => e.vendorName === 'Sri Flower Mart & Co')).toBe(true)
   })
 
   it('round-trips profiles through a full backup export/import', async () => {
@@ -396,6 +498,216 @@ describe('reusable profiles (People & Vendors)', () => {
     await applyBackupImport(inspection.backup, 'add-new')
     expect((await listProfiles('person')).some((p) => p.name === 'Kavitha')).toBe(true)
   })
+
+  it('registers profiles from a backup with NO explicit profiles list — from the actual donor/vendor/person fields in its records', async () => {
+    // Mirrors the legacy 2025 Excel-migration JSON, built before the Profiles feature existed:
+    // valid per backupFileSchema (profiles defaults to []), but carries none explicitly.
+    const now = new Date().toISOString()
+    const legacyStyleBackup = {
+      appName: 'Ganesh Navarathri Manager',
+      backupVersion: 1,
+      exportType: 'single-year' as const,
+      exportedAt: now,
+      years: [
+        {
+          profile: {
+            id: 'legacy-year',
+            year: 3097,
+            name: 'GN 3097 (Legacy)',
+            openingBalance: 0,
+            carryForward: false,
+            status: 'active' as const,
+            createdAt: now,
+            updatedAt: now,
+          },
+          donations: [
+            {
+              id: 'legacy-d1',
+              yearProfileId: 'legacy-year',
+              donorName: 'Legacy Donor',
+              type: 'monetary' as const,
+              date: '3097-08-20',
+              categoryId: await categoryId('donation', 'Chanda'),
+              amount: 1000,
+              createdAt: now,
+              updatedAt: now,
+            },
+          ],
+          expectedDonations: [],
+          expenses: [
+            {
+              id: 'legacy-e1',
+              yearProfileId: 'legacy-year',
+              description: 'Legacy expense',
+              amount: 200,
+              date: '3097-08-20',
+              categoryId: await categoryId('expense', 'Pooja Items'),
+              vendorName: 'Legacy Vendor',
+              createdAt: now,
+              updatedAt: now,
+            },
+          ],
+          expectedExpenses: [],
+          auctions: [
+            { id: 'legacy-a1', yearProfileId: 'legacy-year', item: 'Basket', person: 'Legacy Bidder', amount: 300, date: '3097-09-06', createdAt: now, updatedAt: now },
+          ],
+        },
+      ],
+      settings: { categories: [], units: [] }, // no `profiles` key at all
+    }
+
+    const inspection = await inspectBackupFile(legacyStyleBackup)
+    expect(inspection.valid).toBe(true)
+    if (!inspection.valid) return
+    expect(inspection.summary.profileCount).toBe(0) // nothing explicit in the file
+
+    await applyBackupImport(inspection.backup, 'add-new')
+
+    const people = await listProfiles('person')
+    expect(people.some((p) => p.name === 'Legacy Donor')).toBe(true)
+    expect(people.some((p) => p.name === 'Legacy Bidder')).toBe(true)
+    const vendors = await listProfiles('vendor')
+    expect(vendors.some((v) => v.name === 'Legacy Vendor')).toBe(true)
+  })
+})
+
+describe('copy Actual records forward to Expected (recurring items)', () => {
+  it('copies selected expenses into pending Expected Expenses in the target year, unchanged in the source', async () => {
+    const pooja = await categoryId('expense', 'Pooja Items')
+    const sourceYear = await createYearProfile({ year: 3098, name: 'GN 3098', carryForward: false })
+    const targetYear = await createYearProfile({ year: 3099, name: 'GN 3099', carryForward: false })
+    const priest = await insertExpense(sourceYear.id, {
+      description: 'Priest Charges',
+      amount: 5000,
+      date: '3098-08-20',
+      categoryId: pooja,
+      vendorName: 'Sharma Ji',
+    })
+
+    const count = await copyExpensesToExpected([priest.id], targetYear.id)
+    expect(count).toBe(1)
+
+    const targetExpected = await listExpectedExpensesForYear(targetYear.id)
+    expect(targetExpected).toHaveLength(1)
+    expect(targetExpected[0].description).toBe('Priest Charges')
+    expect(targetExpected[0].amount).toBe(5000)
+    expect(targetExpected[0].vendorName).toBe('Sharma Ji')
+    expect(targetExpected[0].status).toBe('pending')
+
+    // Source expense is untouched.
+    const sourceExpenses = await db.expenses.where('yearProfileId').equals(sourceYear.id).toArray()
+    expect(sourceExpenses).toHaveLength(1)
+    expect(sourceExpenses[0].id).toBe(priest.id)
+  })
+
+  it('copies selected donations (monetary and commodity) into pending Expected Donations in the target year', async () => {
+    const chanda = await categoryId('donation', 'Chanda')
+    const kg = await unitId('kg')
+    const sourceYear = await createYearProfile({ year: 3100, name: 'GN 3100', carryForward: false })
+    const targetYear = await createYearProfile({ year: 3101, name: 'GN 3101', carryForward: false })
+    const monetary = await insertDonation(sourceYear.id, { donorName: 'Regular Donor', type: 'monetary', amount: 2000, date: '3100-08-20', categoryId: chanda })
+    const commodity = await insertDonation(sourceYear.id, {
+      donorName: 'Regular Donor',
+      type: 'commodity',
+      commodityName: 'Rice',
+      quantity: 25,
+      unitId: kg,
+      date: '3100-08-21',
+      categoryId: chanda,
+    })
+
+    const count = await copyDonationsToExpected([monetary.id, commodity.id], targetYear.id)
+    expect(count).toBe(2)
+
+    const targetExpected = await listExpectedDonationsForYear(targetYear.id)
+    expect(targetExpected).toHaveLength(2)
+    const copiedMonetary = targetExpected.find((d) => d.type === 'monetary')!
+    expect(copiedMonetary.amount).toBe(2000)
+    const copiedCommodity = targetExpected.find((d) => d.type === 'commodity')!
+    expect(copiedCommodity.commodityName).toBe('Rice')
+    expect(copiedCommodity.quantity).toBe(25)
+    expect(targetExpected.every((d) => d.status === 'pending')).toBe(true)
+  })
+})
+
+describe('Tasks and checklists', () => {
+  it('creates a task with checklist items parsed at creation, then supports toggling and removing items independently', async () => {
+    const year = await createYearProfile({ year: 3110, name: 'GN 3110', carryForward: false })
+
+    const task = await insertTask(year.id, {
+      title: 'Buy pooja items',
+      dueDate: '3110-08-10',
+      notes: undefined,
+      checklistItems: ['Flowers', 'Coconuts', 'Camphor'],
+    })
+    expect(task.checklist).toHaveLength(3)
+    expect(task.done).toBe(false)
+
+    await toggleChecklistItem(task.id, task.checklist[0].id)
+    let [current] = await listTasksForYear(year.id)
+    expect(current.checklist.find((i) => i.id === task.checklist[0].id)?.done).toBe(true)
+    expect(current.checklist.find((i) => i.id === task.checklist[1].id)?.done).toBe(false)
+
+    await addChecklistItem(task.id, 'Betel leaves')
+    current = (await listTasksForYear(year.id))[0]
+    expect(current.checklist).toHaveLength(4)
+
+    await removeChecklistItem(task.id, task.checklist[1].id)
+    current = (await listTasksForYear(year.id))[0]
+    expect(current.checklist).toHaveLength(3)
+    expect(current.checklist.some((i) => i.id === task.checklist[1].id)).toBe(false)
+  })
+
+  it('marks a task done and back to pending without touching its checklist', async () => {
+    const year = await createYearProfile({ year: 3111, name: 'GN 3111', carryForward: false })
+    const task = await insertTask(year.id, { title: 'Book priest', dueDate: '3111-08-05', notes: undefined, checklistItems: [] })
+
+    await setTaskDone(task.id, true)
+    expect((await listTasksForYear(year.id))[0].done).toBe(true)
+
+    await setTaskDone(task.id, false)
+    expect((await listTasksForYear(year.id))[0].done).toBe(false)
+  })
+})
+
+describe('festival calendar (Key Events + Pooja Roster)', () => {
+  it('round-trips Key Events and Pooja Roster entries through a full backup export/import', async () => {
+    const year = await createYearProfile({ year: 3120, name: 'GN 3120', carryForward: false })
+    await insertKeyEvent(year.id, { name: 'Nimajjanam', date: '3120-09-06', notes: undefined })
+    await insertPoojaAssignment(year.id, { date: '3120-08-29', familyNames: 'Sharma family, Reddy family', notes: undefined })
+
+    const backup = await exportFullBackup()
+    const bundle = backup.years.find((y) => y.profile.id === year.id)!
+    expect(bundle.keyEvents).toHaveLength(1)
+    expect(bundle.poojaAssignments).toHaveLength(1)
+
+    await resetApplication()
+
+    const inspection = await inspectBackupFile(backup)
+    expect(inspection.valid).toBe(true)
+    if (!inspection.valid) return
+    const result = await applyBackupImport(inspection.backup, 'add-new')
+    expect(result.inserted.keyEvents).toBe(1)
+    expect(result.inserted.poojaAssignments).toBe(1)
+
+    const restoredYear = (await listYearProfiles()).find((y) => y.year === 3120)!
+    expect((await listKeyEventsForYear(restoredYear.id))[0].name).toBe('Nimajjanam')
+    expect((await listPoojaAssignmentsForYear(restoredYear.id))[0].familyNames).toBe('Sharma family, Reddy family')
+  })
+
+  it('a backup with no tasks/keyEvents/poojaAssignments fields at all (pre-feature export) still validates', async () => {
+    const backup = await exportFullBackup()
+    const stripped = {
+      ...backup,
+      years: backup.years.map((y) => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { tasks, keyEvents, poojaAssignments, ...rest } = y
+        return rest
+      }),
+    }
+    const inspection = await inspectBackupFile(stripped)
+    expect(inspection.valid).toBe(true)
+  })
 })
 
 describe('reset application', () => {
@@ -403,10 +715,16 @@ describe('reset application', () => {
     const chanda = await categoryId('donation', 'Chanda')
     const year = await createYearProfile({ year: 3090, name: 'GN 3090', carryForward: false })
     await insertDonation(year.id, { donorName: 'X', type: 'monetary', amount: 100, date: '3090-01-01', categoryId: chanda })
+    await insertTask(year.id, { title: 'Leftover task', dueDate: '3090-08-01', notes: undefined, checklistItems: [] })
+    await insertKeyEvent(year.id, { name: 'Leftover event', date: '3090-08-01', notes: undefined })
+    await insertPoojaAssignment(year.id, { date: '3090-08-01', familyNames: 'Leftover family', notes: undefined })
 
     const profiles = await resetApplication()
 
     expect(await db.donations.count()).toBe(0)
+    expect(await db.tasks.count()).toBe(0)
+    expect(await db.keyEvents.count()).toBe(0)
+    expect(await db.poojaAssignments.count()).toBe(0)
     expect(await db.yearProfiles.count()).toBe(1)
     expect(profiles).toHaveLength(1)
     const cats = await listCategories('donation')

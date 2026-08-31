@@ -44,6 +44,30 @@ export function useAuctions(yearProfileId: string | undefined) {
   )
 }
 
+export function useTasks(yearProfileId: string | undefined) {
+  return useLiveQuery(
+    () => (yearProfileId ? db.tasks.where('yearProfileId').equals(yearProfileId).toArray() : []),
+    [yearProfileId],
+    undefined,
+  )
+}
+
+export function useKeyEvents(yearProfileId: string | undefined) {
+  return useLiveQuery(
+    () => (yearProfileId ? db.keyEvents.where('yearProfileId').equals(yearProfileId).toArray() : []),
+    [yearProfileId],
+    undefined,
+  )
+}
+
+export function usePoojaAssignments(yearProfileId: string | undefined) {
+  return useLiveQuery(
+    () => (yearProfileId ? db.poojaAssignments.where('yearProfileId').equals(yearProfileId).toArray() : []),
+    [yearProfileId],
+    undefined,
+  )
+}
+
 export function useCategories(kind?: 'donation' | 'expense') {
   return useLiveQuery(async () => {
     const all = await db.categories.toArray()

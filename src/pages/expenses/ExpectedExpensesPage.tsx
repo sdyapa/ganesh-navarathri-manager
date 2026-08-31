@@ -7,7 +7,7 @@ import { usePagination } from '@/hooks/usePagination'
 import { useToast } from '@/context/ToastContext'
 import { DataTable, type DataTableColumn } from '@/components/common/DataTable'
 import { EmptyState } from '@/components/common/EmptyState'
-import { FilterBar, SearchInput, SelectFilter } from '@/components/common/Filters'
+import { FilterBar, SearchInput, SelectFilter, SortControl } from '@/components/common/Filters'
 import { Pagination } from '@/components/common/Pagination'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { SummaryList } from '@/components/common/SummaryList'
@@ -21,7 +21,7 @@ import {
 import { moveExpectedExpenseToExpense } from '@/services/conversionService'
 import { formatCurrency } from '@/lib/currency'
 import { formatDisplayDate, todayDateOnly } from '@/lib/date'
-import { matchesSearch } from '@/lib/tableUtils'
+import { matchesSearch, sortByKey, type SortDirection } from '@/lib/tableUtils'
 import { diffFields } from '@/lib/diff'
 import type { ExpenseInput } from '@/lib/validation'
 import type { ExpectedExpense } from '@/types'
@@ -31,6 +31,13 @@ type ModalState =
   | { mode: 'add' }
   | { mode: 'edit'; record: ExpectedExpense }
   | { mode: 'move'; record: ExpectedExpense }
+
+const SORT_OPTIONS = [
+  { value: 'date-desc', label: 'Expected Date (Newest first)' },
+  { value: 'date-asc', label: 'Expected Date (Oldest first)' },
+  { value: 'amount-desc', label: 'Amount (High to Low)' },
+  { value: 'amount-asc', label: 'Amount (Low to High)' },
+]
 
 export function ExpectedExpensesPage() {
   const { currentYearId } = useYearContext()
@@ -45,16 +52,18 @@ export function ExpectedExpensesPage() {
   const [busy, setBusy] = useState(false)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('pending')
+  const [sortOption, setSortOption] = useState('date-desc')
 
   const categoryName = (id: string) => categories?.find((c) => c.id === id)?.name ?? 'Uncategorized'
 
   const filtered = useMemo(() => {
     if (!records) return []
-    return records
+    const [sortField, sortDirection] = sortOption.split('-') as [keyof ExpectedExpense, SortDirection]
+    const base = records
       .filter((e) => (statusFilter ? e.status === statusFilter : true))
       .filter((e) => matchesSearch([e.description, e.notes], search))
-      .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
-  }, [records, statusFilter, search])
+    return sortByKey(base, sortField, sortDirection)
+  }, [records, statusFilter, search, sortOption])
 
   const { pageItems, page, totalPages, hasNext, hasPrev, next, prev } = usePagination(filtered, 25)
 
@@ -189,6 +198,7 @@ export function ExpectedExpensesPage() {
                 { value: 'converted', label: 'Moved' },
               ]}
             />
+            <SortControl value={sortOption} onChange={setSortOption} options={SORT_OPTIONS} />
           </FilterBar>
 
           {filtered.length === 0 ? (

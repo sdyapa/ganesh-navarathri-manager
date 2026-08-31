@@ -7,7 +7,8 @@
 // On-screen React components must keep using formatCurrency from '@/lib/currency' directly.
 import { formatCurrencyForPdf, formatNumber } from '@/lib/currency'
 import { formatDisplayDate } from '@/lib/date'
-import type { Auction, Category, Donation, Expense, FinancialSummary, Unit } from '@/types'
+import type { Auction, Category, CommodityTotal, Donation, Expense, FinancialSummary, Unit } from '@/types'
+import type { CategoryTotal } from '@/lib/calculations'
 import type { PdfTableSpec } from './pdf'
 
 type AmountFormatter = (amount: number | undefined | null) => string
@@ -97,4 +98,32 @@ export function buildSummaryLines(summary: FinancialSummary): string[] {
     `Expected Monetary Donations: ${formatCurrencyForPdf(summary.expectedMonetaryDonations)} (${summary.counts.expectedDonations} pending)`,
     `Expected Expenses: ${formatCurrencyForPdf(summary.expectedExpenses)} (${summary.counts.expectedExpenses} pending)`,
   ]
+}
+
+/** Same figures as buildSummaryLines, minus the two "Expected ..." lines — for the Overall
+ *  Summary report meant to be shared once the festival is over, where pending pledges aren't
+ *  relevant (see Dashboard.tsx's "Export Overall Summary PDF"). */
+export function buildOverallSummaryLines(summary: FinancialSummary): string[] {
+  return [
+    `Opening Balance: ${formatCurrencyForPdf(summary.openingBalance)}`,
+    `Monetary Donations: ${formatCurrencyForPdf(summary.totalMonetaryDonations)} (${summary.counts.monetaryDonations})`,
+    `Commodity Donations: ${summary.counts.commodityDonations} entr(y/ies)`,
+    `Total Expenses: ${formatCurrencyForPdf(summary.totalExpenses)} (${summary.counts.expenses})`,
+    `Closing Balance: ${formatCurrencyForPdf(summary.closingBalance)}`,
+    `Auction Proceeds (pledged, collected next year): ${formatCurrencyForPdf(summary.totalAuctionProceeds)} (${summary.counts.auctions})`,
+  ]
+}
+
+export function buildCategoryTotalsTable(totals: CategoryTotal[], formatAmount: AmountFormatter = formatCurrencyForPdf): PdfTableSpec {
+  return {
+    head: ['Category', 'Total', 'Count'],
+    rows: totals.map((c) => [c.categoryName, formatAmount(c.total), String(c.count)]),
+  }
+}
+
+export function buildCommodityTotalsTable(totals: CommodityTotal[]): PdfTableSpec {
+  return {
+    head: ['Commodity', 'Total Quantity', 'Unit', 'Donors'],
+    rows: totals.map((c) => [c.commodityName, formatNumber(c.totalQuantity), c.unitName, String(c.donorCount)]),
+  }
 }

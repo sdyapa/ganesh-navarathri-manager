@@ -14,10 +14,19 @@ export interface ExpenseFormValues {
   categoryId: string
   notes: string
   vendorName: string
+  paymentGroup: string
 }
 
 export function defaultExpenseFormValues(categories: Category[]): ExpenseFormValues {
-  return { description: '', amount: '', date: todayDateOnly(), categoryId: categories[0]?.id ?? '', notes: '', vendorName: '' }
+  return {
+    description: '',
+    amount: '',
+    date: todayDateOnly(),
+    categoryId: categories[0]?.id ?? '',
+    notes: '',
+    vendorName: '',
+    paymentGroup: '',
+  }
 }
 
 export function expenseToFormValues(e: Expense | ExpectedExpense, overrideDate?: string): ExpenseFormValues {
@@ -28,6 +37,7 @@ export function expenseToFormValues(e: Expense | ExpectedExpense, overrideDate?:
     categoryId: e.categoryId,
     notes: e.notes ?? '',
     vendorName: e.vendorName ?? '',
+    paymentGroup: (e as Partial<Expense>).paymentGroup ?? '',
   }
 }
 
@@ -38,9 +48,13 @@ interface ExpenseFormProps {
   categories: Category[]
   onSubmit: (input: ExpenseInput) => Promise<void> | void
   onClose: () => void
+  /** Distinct Payment Group values already used this year, for the datalist. Omit entirely to
+   *  hide the field — used by the Expected Expenses / conversion forms, since grouping split
+   *  payments only makes sense once a record is actual (see Expense.paymentGroup's doc comment). */
+  paymentGroupOptions?: string[]
 }
 
-export function ExpenseForm({ title, submitLabel, initialValues, categories, onSubmit, onClose }: ExpenseFormProps) {
+export function ExpenseForm({ title, submitLabel, initialValues, categories, onSubmit, onClose, paymentGroupOptions }: ExpenseFormProps) {
   const [values, setValues] = useState(initialValues)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
@@ -48,6 +62,7 @@ export function ExpenseForm({ title, submitLabel, initialValues, categories, onS
   const activeCategories = categories.filter((c) => c.active || c.id === values.categoryId)
   const vendorProfiles = useProfiles('vendor')
   const vendorListId = useId()
+  const paymentGroupListId = useId()
 
   const set = <K extends keyof ExpenseFormValues>(key: K, value: ExpenseFormValues[K]) =>
     setValues((prev) => ({ ...prev, [key]: value }))
@@ -62,6 +77,7 @@ export function ExpenseForm({ title, submitLabel, initialValues, categories, onS
       categoryId: values.categoryId,
       notes: values.notes || undefined,
       vendorName: values.vendorName || undefined,
+      paymentGroup: values.paymentGroup || undefined,
     })
     if (!parsed.success) {
       const fieldErrors: Record<string, string> = {}
@@ -116,6 +132,25 @@ export function ExpenseForm({ title, submitLabel, initialValues, categories, onS
             {vendorProfiles?.map((p) => <option key={p.id} value={p.name} />)}
           </datalist>
         </FormField>
+        {paymentGroupOptions && (
+          <FormField
+            label="Payment Group"
+            htmlFor="paymentGroup"
+            error={errors.paymentGroup}
+            hint="Optional — visually group split payments (advance/part/final) to the same vendor; doesn't affect reports or exports"
+          >
+            <input
+              id="paymentGroup"
+              type="text"
+              list={paymentGroupListId}
+              value={values.paymentGroup}
+              onChange={(e) => set('paymentGroup', e.target.value)}
+            />
+            <datalist id={paymentGroupListId}>
+              {paymentGroupOptions.map((g) => <option key={g} value={g} />)}
+            </datalist>
+          </FormField>
+        )}
         <div className="form-row">
           <FormField label="Amount (₹)" htmlFor="amount" required error={errors.amount}>
             <input

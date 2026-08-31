@@ -8,12 +8,29 @@ import { useToast } from '@/context/ToastContext'
 import { formatCurrency } from '@/lib/currency'
 import { formatDisplayDate, todayDateOnly } from '@/lib/date'
 import { buildPdfReport, pdfFileName } from '@/lib/export/pdf'
-import { buildSummaryLines } from '@/lib/export/reportBuilders'
+import {
+  buildSummaryLines,
+  buildOverallSummaryLines,
+  buildCategoryTotalsTable,
+  buildCommodityTotalsTable,
+  buildAuctionsTable,
+} from '@/lib/export/reportBuilders'
 import { exportElementAsPng, pngFileName } from '@/lib/export/png'
 import { getAppSettings } from '@/db/repositories/settings'
 
 export function Dashboard() {
-  const { loading, currentYear, summary, donations, expenses, auctions, expectedDonations } = useYearSummary()
+  const {
+    loading,
+    currentYear,
+    summary,
+    donations,
+    expenses,
+    auctions,
+    expectedDonations,
+    donationCategoryTotals,
+    expenseCategoryTotals,
+    commodityTotals,
+  } = useYearSummary()
   const { showToast } = useToast()
   const reportRef = useRef<HTMLDivElement>(null)
 
@@ -32,6 +49,28 @@ export function Dashboard() {
         summaryLines: buildSummaryLines(summary),
       })
       doc.save(pdfFileName(currentYear.name, 'Summary Report'))
+    } catch {
+      showToast('Could not generate PDF. Please try again.', 'error')
+    }
+  }
+
+  async function handleExportOverallSummary() {
+    if (!currentYear || !summary) return
+    try {
+      const { displayName } = await getAppSettings()
+      const doc = await buildPdfReport({
+        yearName: currentYear.name,
+        reportTitle: 'Overall Summary Report',
+        appName: displayName,
+        summaryLines: buildOverallSummaryLines(summary),
+        extraTables: [
+          { heading: 'Donations by Category', table: buildCategoryTotalsTable(donationCategoryTotals) },
+          { heading: 'Commodity Donations', table: buildCommodityTotalsTable(commodityTotals) },
+          { heading: 'Auction Details', table: buildAuctionsTable(auctions) },
+          { heading: 'Expenses by Category', table: buildCategoryTotalsTable(expenseCategoryTotals) },
+        ],
+      })
+      doc.save(pdfFileName(currentYear.name, 'Overall Summary Report'))
     } catch {
       showToast('Could not generate PDF. Please try again.', 'error')
     }
@@ -69,7 +108,12 @@ export function Dashboard() {
           <h1>{currentYear.name}</h1>
           <p className="page__subtitle">Financial summary as of {formatDisplayDate(todayDateOnly())}</p>
         </div>
-        <ExportButtons onExportPdf={handleExportPdf} onExportPng={handleExportPng} pdfLabel="Export Summary PDF" pngLabel="Export Summary PNG" />
+        <div className="row-actions">
+          <ExportButtons onExportPdf={handleExportPdf} onExportPng={handleExportPng} pdfLabel="Export Summary PDF" pngLabel="Export Summary PNG" />
+          <button type="button" className="button button--secondary" onClick={handleExportOverallSummary}>
+            Export Overall Summary PDF
+          </button>
+        </div>
       </div>
 
       {!hasAnyData && (

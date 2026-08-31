@@ -7,17 +7,21 @@ import { usePagination } from '@/hooks/usePagination'
 import { useToast } from '@/context/ToastContext'
 import { DataTable, type DataTableColumn } from '@/components/common/DataTable'
 import { EmptyState } from '@/components/common/EmptyState'
-import { FilterBar, SearchInput, SelectFilter, DateRangeFilter } from '@/components/common/Filters'
+import { FilterBar, SearchInput, SelectFilter, SortControl, DateRangeFilter } from '@/components/common/Filters'
 import { Pagination } from '@/components/common/Pagination'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { FieldDiffList } from '@/components/common/FieldDiffList'
 import { SummaryList } from '@/components/common/SummaryList'
 import { ExportButtons } from '@/components/common/ExportButtons'
+import { CopyToYearModal, NEXT_YEAR_VALUE } from '@/components/common/CopyToYearModal'
 import { ExpenseForm, defaultExpenseFormValues, expenseToFormValues } from './ExpenseForm'
 import { insertExpense, updateExpense, deleteExpense } from '@/db/repositories/expenses'
+import { copyExpensesToExpected } from '@/services/copyForwardService'
+import { revertExpenseToExpected } from '@/services/conversionService'
+import { getOrCreateNextYearProfile } from '@/services/yearService'
 import { formatCurrency, formatCurrencyForPdf } from '@/lib/currency'
 import { formatDisplayDate, isDateInRange } from '@/lib/date'
-import { matchesSearch } from '@/lib/tableUtils'
+import { matchesSearch, sortByKey, type SortDirection } from '@/lib/tableUtils'
 import { diffFields } from '@/lib/diff'
 import { buildPdfReport, pdfFileName } from '@/lib/export/pdf'
 import { buildExpensesTable } from '@/lib/export/reportBuilders'
@@ -26,10 +30,17 @@ import { getAppSettings } from '@/db/repositories/settings'
 import type { ExpenseInput } from '@/lib/validation'
 import type { Expense } from '@/types'
 
-type ModalState = { mode: 'closed' } | { mode: 'add' } | { mode: 'edit'; expense: Expense }
+type ModalState = { mode: 'closed' } | { mode: 'add' } | { mode: 'edit'; expense: Expense } | { mode: 'copy' }
+
+const SORT_OPTIONS = [
+  { value: 'date-desc', label: 'Date (Newest first)' },
+  { value: 'date-asc', label: 'Date (Oldest first)' },
+  { value: 'amount-desc', label: 'Amount (High to Low)' },
+  { value: 'amount-asc', label: 'Amount (Low to High)' },
+]
 
 export function ExpensesPage() {
-  const { currentYearId, currentYear } = useYearContext()
+  const { currentYearId, currentYear, years } = useYearContext()
   const expenses = useExpenses(currentYearId)
   const categories = useCategories('expense')
   const { showToast } = useToast()
@@ -38,24 +49,55 @@ export function ExpensesPage() {
   const [modal, setModal] = useState<ModalState>(searchParams.get('add') ? { mode: 'add' } : { mode: 'closed' })
   const [pendingEdit, setPendingEdit] = useState<{ expense: Expense; input: ExpenseInput } | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Expense | null>(null)
+  const [revertTarget, setRevertTarget] = useState<Expense | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
 
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [sortOption, setSortOption] = useState('date-desc')
+  const [groupByPaymentGroup, setGroupByPaymentGroup] = useState(false)
 
   const categoryName = (id: string) => categories?.find((c) => c.id === id)?.name ?? 'Uncategorized'
 
   const filtered = useMemo(() => {
     if (!expenses) return []
-    return expenses
+    const [sortField, sortDirection] = sortOption.split('-') as [keyof Expense, SortDirection]
+    const base = expenses
       .filter((e) => (categoryFilter ? e.categoryId === categoryFilter : true))
       .filter((e) => isDateInRange(e.date, dateFrom || undefined, dateTo || undefined))
       .filter((e) => matchesSearch([e.description, e.notes, categoryName(e.categoryId)], search))
-      .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+    return sortByKey(base, sortField, sortDirection)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expenses, categoryFilter, dateFrom, dateTo, search, categories])
+  }, [expenses, categoryFilter, dateFrom, dateTo, search, sortOption, categories])
+
+  // Distinct Payment Group labels already used this year, for the form's autocomplete —
+  // purely local to this year's list, no cross-year registry (see Expense.paymentGroup's doc
+  // comment for why this stays a plain year-scoped free-text field, not a Profile).
+  const paymentGroupOptions = useMemo(() => {
+    if (!expenses) return []
+    const names = new Set(expenses.map((e) => e.paymentGroup).filter((g): g is string => Boolean(g)))
+    return [...names].sort((a, b) => a.localeCompare(b))
+  }, [expenses])
+
+  // Groups filtered expenses by paymentGroup for the visual-only "Group by Payment Group"
+  // view — computed even when the toggle is off is cheap, and keeps the toggle's JSX simple.
+  const groupedByPaymentGroup = useMemo(() => {
+    const groups = new Map<string, Expense[]>()
+    const ungrouped: Expense[] = []
+    for (const e of filtered) {
+      if (e.paymentGroup) {
+        const list = groups.get(e.paymentGroup) ?? []
+        list.push(e)
+        groups.set(e.paymentGroup, list)
+      } else {
+        ungrouped.push(e)
+      }
+    }
+    return { groups: [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0])), ungrouped }
+  }, [filtered])
 
   const { pageItems, page, totalPages, hasNext, hasPrev, next, prev } = usePagination(filtered, 25)
 
@@ -75,6 +117,7 @@ export function ExpensesPage() {
     const changes = diffFields([
       ['Description', original.description, input.description],
       ['Vendor', original.vendorName ?? '', input.vendorName ?? ''],
+      ['Payment Group', original.paymentGroup ?? '', input.paymentGroup ?? ''],
       ['Amount', formatCurrency(original.amount), formatCurrency(input.amount)],
       ['Category', categoryName(original.categoryId), categoryName(input.categoryId)],
       ['Date', formatDisplayDate(original.date), formatDisplayDate(input.date)],
@@ -107,6 +150,56 @@ export function ExpensesPage() {
       await deleteExpense(deleteTarget.id)
       setDeleteTarget(null)
       showToast('Expense deleted', 'info')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function confirmRevert() {
+    if (!revertTarget) return
+    setBusy(true)
+    try {
+      await revertExpenseToExpected(revertTarget)
+      setRevertTarget(null)
+      showToast('Moved back to Expected Expenses', 'info')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAllOnPage() {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      const allSelected = pageItems.length > 0 && pageItems.every((e) => next.has(e.id))
+      for (const e of pageItems) {
+        if (allSelected) next.delete(e.id)
+        else next.add(e.id)
+      }
+      return next
+    })
+  }
+
+  async function handleCopyToExpected(targetYearSelection: string) {
+    if (!currentYearId || !currentYear) return
+    setBusy(true)
+    try {
+      const { targetYearId, targetYearName } =
+        targetYearSelection === NEXT_YEAR_VALUE
+          ? await getOrCreateNextYearProfile(currentYearId).then((r) => ({ targetYearId: r.profile.id, targetYearName: r.profile.name }))
+          : { targetYearId: targetYearSelection, targetYearName: years.find((y) => y.id === targetYearSelection)?.name ?? 'target year' }
+      const count = await copyExpensesToExpected([...selectedIds], targetYearId)
+      setSelectedIds(new Set())
+      setModal({ mode: 'closed' })
+      showToast(`Copied ${count} expense(s) to Expected Expenses in ${targetYearName}`)
     } finally {
       setBusy(false)
     }
@@ -164,6 +257,11 @@ export function ExpensesPage() {
           <button type="button" className="link-button link-button--danger" onClick={() => setDeleteTarget(e)}>
             Delete
           </button>
+          {e.sourceExpectedExpenseId && (
+            <button type="button" className="link-button" onClick={() => setRevertTarget(e)}>
+              Move back to Expected
+            </button>
+          )}
         </div>
       ),
     },
@@ -206,18 +304,68 @@ export function ExpensesPage() {
               options={categories.map((c) => ({ value: c.id, label: c.name }))}
             />
             <DateRangeFilter from={dateFrom} to={dateTo} onFromChange={setDateFrom} onToChange={setDateTo} />
+            <SortControl value={sortOption} onChange={setSortOption} options={SORT_OPTIONS} />
           </FilterBar>
 
-          <ExportButtons onExportPdf={handleExportPdf} onExportPng={handleExportPng} />
+          <div className="row-actions">
+            <ExportButtons onExportPdf={handleExportPdf} onExportPng={handleExportPng} />
+            {selectedIds.size > 0 && (
+              <button type="button" className="button button--secondary" onClick={() => setModal({ mode: 'copy' })}>
+                Copy {selectedIds.size} to Expected Expenses
+              </button>
+            )}
+            <label className="toggle-row">
+              <input type="checkbox" checked={groupByPaymentGroup} onChange={(e) => setGroupByPaymentGroup(e.target.checked)} />
+              Group by Payment Group
+            </label>
+          </div>
 
           {filtered.length === 0 ? (
             <EmptyState title="No matching expenses" description="Try adjusting your search or filters." />
+          ) : groupByPaymentGroup ? (
+            // Visual-only grouping — bypasses DataTable/pagination entirely so the normal list
+            // view (and every report/export, which never reads paymentGroup) stays untouched.
+            <div className="card-list">
+              {groupedByPaymentGroup.groups.map(([group, items]) => (
+                <div key={group} className="record-card">
+                  <div className="record-card__top">
+                    <strong>{group}</strong>
+                    <span className="badge">{formatCurrency(items.reduce((s, e) => s + e.amount, 0))}</span>
+                  </div>
+                  {items.map((e) => (
+                    <div key={e.id} className="record-card__meta record-card__group-row">
+                      <span>
+                        {formatDisplayDate(e.date)} · {e.description}
+                      </span>
+                      <span>{formatCurrency(e.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+              {groupedByPaymentGroup.ungrouped.length > 0 && (
+                <div className="record-card">
+                  <div className="record-card__top">
+                    <strong>Ungrouped</strong>
+                    <span className="badge">{formatCurrency(groupedByPaymentGroup.ungrouped.reduce((s, e) => s + e.amount, 0))}</span>
+                  </div>
+                  {groupedByPaymentGroup.ungrouped.map((e) => (
+                    <div key={e.id} className="record-card__meta record-card__group-row">
+                      <span>
+                        {formatDisplayDate(e.date)} · {e.description}
+                      </span>
+                      <span>{formatCurrency(e.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           ) : (
             <>
               <DataTable
                 columns={columns}
                 data={pageItems}
                 rowKey={(e) => e.id}
+                selection={{ selectedIds, onToggle: toggleSelected, onToggleAll: toggleSelectAllOnPage }}
                 renderCard={(e) => (
                   <>
                     <div className="record-card__top">
@@ -235,6 +383,11 @@ export function ExpensesPage() {
                       <button type="button" className="link-button link-button--danger" onClick={() => setDeleteTarget(e)}>
                         Delete
                       </button>
+                      {e.sourceExpectedExpenseId && (
+                        <button type="button" className="link-button" onClick={() => setRevertTarget(e)}>
+                          Move back to Expected
+                        </button>
+                      )}
                     </div>
                   </>
                 )}
@@ -251,6 +404,7 @@ export function ExpensesPage() {
           submitLabel="Save Expense"
           initialValues={defaultExpenseFormValues(categories)}
           categories={categories}
+          paymentGroupOptions={paymentGroupOptions}
           onSubmit={handleAdd}
           onClose={() => {
             setModal({ mode: 'closed' })
@@ -266,7 +420,20 @@ export function ExpensesPage() {
           submitLabel="Save Changes"
           initialValues={expenseToFormValues(modal.expense)}
           categories={categories}
+          paymentGroupOptions={paymentGroupOptions}
           onSubmit={(input) => handleEditSubmit(modal.expense, input)}
+          onClose={() => setModal({ mode: 'closed' })}
+        />
+      )}
+
+      {modal.mode === 'copy' && currentYear && (
+        <CopyToYearModal
+          title="Copy to Expected Expenses"
+          itemLabel={`${selectedIds.size} expense(s)`}
+          sourceYear={currentYear}
+          years={years}
+          busy={busy}
+          onConfirm={handleCopyToExpected}
           onClose={() => setModal({ mode: 'closed' })}
         />
       )}
@@ -279,6 +446,7 @@ export function ExpensesPage() {
               changes={diffFields([
                 ['Description', pendingEdit.expense.description, pendingEdit.input.description],
                 ['Vendor', pendingEdit.expense.vendorName ?? '', pendingEdit.input.vendorName ?? ''],
+                ['Payment Group', pendingEdit.expense.paymentGroup ?? '', pendingEdit.input.paymentGroup ?? ''],
                 ['Amount', formatCurrency(pendingEdit.expense.amount), formatCurrency(pendingEdit.input.amount)],
                 ['Category', categoryName(pendingEdit.expense.categoryId), categoryName(pendingEdit.input.categoryId)],
                 ['Date', formatDisplayDate(pendingEdit.expense.date), formatDisplayDate(pendingEdit.input.date)],
@@ -310,6 +478,26 @@ export function ExpensesPage() {
           danger
           onConfirm={confirmDelete}
           onCancel={() => setDeleteTarget(null)}
+          busy={busy}
+        />
+      )}
+
+      {revertTarget && (
+        <ConfirmDialog
+          title="Move back to Expected?"
+          description="This actual expense will be deleted and the original Expected Expense it was converted from will be restored as pending."
+          summary={
+            <SummaryList
+              rows={[
+                { label: 'Description', value: revertTarget.description },
+                { label: 'Amount', value: formatCurrency(revertTarget.amount) },
+                { label: 'Date', value: formatDisplayDate(revertTarget.date) },
+              ]}
+            />
+          }
+          confirmLabel="Move back to Expected"
+          onConfirm={confirmRevert}
+          onCancel={() => setRevertTarget(null)}
           busy={busy}
         />
       )}

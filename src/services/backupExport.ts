@@ -10,20 +10,26 @@ import { getYearProfile, listYearProfiles } from '@/db/repositories/yearProfiles
 import { listCategories } from '@/db/repositories/categories'
 import { listUnits } from '@/db/repositories/units'
 import { listProfiles } from '@/db/repositories/profiles'
+import { listTasksForYear } from '@/db/repositories/tasks'
+import { listKeyEventsForYear } from '@/db/repositories/keyEvents'
+import { listPoojaAssignmentsForYear } from '@/db/repositories/poojaAssignments'
 import { getAppSettings } from '@/db/repositories/settings'
 import { nowIso } from '@/lib/date'
 
 async function buildYearBundle(yearProfileId: string): Promise<YearProfileBundle> {
   const profile = await getYearProfile(yearProfileId)
   if (!profile) throw new Error('Year profile not found')
-  const [donations, expectedDonations, expenses, expectedExpenses, auctions] = await Promise.all([
+  const [donations, expectedDonations, expenses, expectedExpenses, auctions, tasks, keyEvents, poojaAssignments] = await Promise.all([
     listDonationsForYear(yearProfileId),
     listExpectedDonationsForYear(yearProfileId),
     listExpensesForYear(yearProfileId),
     listExpectedExpensesForYear(yearProfileId),
     listAuctionsForYear(yearProfileId),
+    listTasksForYear(yearProfileId),
+    listKeyEventsForYear(yearProfileId),
+    listPoojaAssignmentsForYear(yearProfileId),
   ])
-  return { profile, donations, expectedDonations, expenses, expectedExpenses, auctions }
+  return { profile, donations, expectedDonations, expenses, expectedExpenses, auctions, tasks, keyEvents, poojaAssignments }
 }
 
 async function buildSettingsBlock() {

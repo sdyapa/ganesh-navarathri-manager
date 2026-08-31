@@ -28,6 +28,7 @@ export async function insertExpense(
     categoryId: input.categoryId,
     notes: input.notes?.trim() || undefined,
     vendorName: input.vendorName?.trim() || undefined,
+    paymentGroup: input.paymentGroup?.trim() || undefined,
     sourceExpectedExpenseId: sourceExpectedExpenseId ?? null,
     createdAt: now,
     updatedAt: now,
@@ -45,6 +46,7 @@ export async function updateExpense(id: string, input: ExpenseInput): Promise<vo
     categoryId: input.categoryId,
     notes: input.notes?.trim() || undefined,
     vendorName: input.vendorName?.trim() || undefined,
+    paymentGroup: input.paymentGroup?.trim() || undefined,
     updatedAt: nowIso(),
   })
   await upsertProfileFromName('vendor', input.vendorName)

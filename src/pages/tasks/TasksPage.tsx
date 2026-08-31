@@ -1,0 +1,236 @@
+import { useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { useYearContext } from '@/context/YearContext'
+import { useTasks } from '@/hooks/useYearData'
+import { useToast } from '@/context/ToastContext'
+import { EmptyState } from '@/components/common/EmptyState'
+import { FilterBar, SelectFilter, SortControl } from '@/components/common/Filters'
+import { ConfirmDialog } from '@/components/common/ConfirmDialog'
+import { SummaryList } from '@/components/common/SummaryList'
+import { TaskForm, defaultTaskFormValues, taskToFormValues } from './TaskForm'
+import {
+  insertTask,
+  updateTask,
+  deleteTask,
+  setTaskDone,
+  addChecklistItem,
+  toggleChecklistItem,
+  removeChecklistItem,
+} from '@/db/repositories/tasks'
+import { formatDisplayDate } from '@/lib/date'
+import { sortByKey, type SortDirection } from '@/lib/tableUtils'
+import type { TaskInput } from '@/lib/validation'
+import type { Task } from '@/types'
+
+type ModalState = { mode: 'closed' } | { mode: 'add' } | { mode: 'edit'; task: Task }
+
+const SORT_OPTIONS = [
+  { value: 'dueDate-asc', label: 'Due Date (Soonest first)' },
+  { value: 'dueDate-desc', label: 'Due Date (Latest first)' },
+  { value: 'title-asc', label: 'Title (A–Z)' },
+]
+
+export function TasksPage() {
+  const { currentYearId } = useYearContext()
+  const tasks = useTasks(currentYearId)
+  const { showToast } = useToast()
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  const [modal, setModal] = useState<ModalState>(searchParams.get('add') ? { mode: 'add' } : { mode: 'closed' })
+  const [deleteTarget, setDeleteTarget] = useState<Task | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [statusFilter, setStatusFilter] = useState('pending')
+  const [sortOption, setSortOption] = useState('dueDate-asc')
+  const [checklistDrafts, setChecklistDrafts] = useState<Record<string, string>>({})
+
+  const filtered = useMemo(() => {
+    if (!tasks) return []
+    const [sortField, sortDirection] = sortOption.split('-') as [keyof Task, SortDirection]
+    const base = tasks.filter((t) => {
+      if (statusFilter === 'pending') return !t.done
+      if (statusFilter === 'done') return t.done
+      return true
+    })
+    return sortByKey(base, sortField, sortDirection)
+  }, [tasks, statusFilter, sortOption])
+
+  if (!currentYearId || tasks === undefined) {
+    return <p className="page-loading">Loading tasks…</p>
+  }
+
+  async function handleAdd(input: TaskInput) {
+    await insertTask(currentYearId!, input)
+    setModal({ mode: 'closed' })
+    searchParams.delete('add')
+    setSearchParams(searchParams, { replace: true })
+    showToast('Task added')
+  }
+
+  async function handleEdit(task: Task, input: TaskInput) {
+    await updateTask(task.id, input)
+    setModal({ mode: 'closed' })
+    showToast('Task updated')
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return
+    setBusy(true)
+    try {
+      await deleteTask(deleteTarget.id)
+      setDeleteTarget(null)
+      showToast('Task deleted', 'info')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleAddChecklistItem(taskId: string) {
+    const label = checklistDrafts[taskId]?.trim()
+    if (!label) return
+    await addChecklistItem(taskId, label)
+    setChecklistDrafts((prev) => ({ ...prev, [taskId]: '' }))
+  }
+
+  return (
+    <div className="page">
+      <div className="page__header">
+        <div>
+          <h1>Tasks</h1>
+          <p className="page__subtitle">Upcoming to-dos with due dates — some can carry their own checklist (e.g. a "Pooja items list").</p>
+        </div>
+        <button type="button" className="button button--primary" onClick={() => setModal({ mode: 'add' })}>
+          + Add Task
+        </button>
+      </div>
+
+      {tasks.length === 0 ? (
+        <EmptyState
+          title="No tasks yet"
+          description="Track upcoming to-dos with due dates — e.g. 'Book priest', 'Buy pooja items'."
+          action={
+            <button type="button" className="button button--primary" onClick={() => setModal({ mode: 'add' })}>
+              + Add Task
+            </button>
+          }
+        />
+      ) : (
+        <>
+          <FilterBar>
+            <SelectFilter
+              label="Status"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={[
+                { value: 'pending', label: 'Pending' },
+                { value: 'done', label: 'Done' },
+              ]}
+            />
+            <SortControl value={sortOption} onChange={setSortOption} options={SORT_OPTIONS} />
+          </FilterBar>
+
+          {filtered.length === 0 ? (
+            <EmptyState title="No matching tasks" description="Try adjusting your filters." />
+          ) : (
+            <div className="card-list">
+              {filtered.map((t) => (
+                <div key={t.id} className="record-card">
+                  <div className="record-card__top">
+                    <strong>{t.title}</strong>
+                    {t.done ? <span className="badge badge--success">Done</span> : <span className="badge">Pending</span>}
+                  </div>
+                  <div className="record-card__meta">Due {formatDisplayDate(t.dueDate)}</div>
+                  {t.notes && <div className="record-card__notes">{t.notes}</div>}
+
+                  {t.checklist.length > 0 && (
+                    <ul className="manage-list">
+                      {t.checklist.map((item) => (
+                        <li key={item.id} className="manage-list__item">
+                          <label className="record-card__select">
+                            <input type="checkbox" checked={item.done} onChange={() => toggleChecklistItem(t.id, item.id)} />
+                            <span className={item.done ? 'checklist-item--done' : undefined}>{item.label}</span>
+                          </label>
+                          <button type="button" className="link-button link-button--danger" onClick={() => removeChecklistItem(t.id, item.id)}>
+                            Remove
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <div className="inline-form">
+                    <input
+                      type="text"
+                      placeholder="Add checklist item…"
+                      value={checklistDrafts[t.id] ?? ''}
+                      onChange={(e) => setChecklistDrafts((prev) => ({ ...prev, [t.id]: e.target.value }))}
+                      onKeyDown={(e) => e.key === 'Enter' && handleAddChecklistItem(t.id)}
+                    />
+                    <button type="button" className="button button--secondary" onClick={() => handleAddChecklistItem(t.id)}>
+                      + Add Item
+                    </button>
+                  </div>
+
+                  <div className="row-actions">
+                    <button type="button" className="link-button" onClick={() => setTaskDone(t.id, !t.done)}>
+                      {t.done ? 'Mark Pending' : 'Mark Done'}
+                    </button>
+                    <button type="button" className="link-button" onClick={() => setModal({ mode: 'edit', task: t })}>
+                      Edit
+                    </button>
+                    <button type="button" className="link-button link-button--danger" onClick={() => setDeleteTarget(t)}>
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {modal.mode === 'add' && (
+        <TaskForm
+          title="Add Task"
+          submitLabel="Save Task"
+          initialValues={defaultTaskFormValues()}
+          showChecklistInput
+          onSubmit={handleAdd}
+          onClose={() => {
+            setModal({ mode: 'closed' })
+            searchParams.delete('add')
+            setSearchParams(searchParams, { replace: true })
+          }}
+        />
+      )}
+
+      {modal.mode === 'edit' && (
+        <TaskForm
+          title="Edit Task"
+          submitLabel="Save Changes"
+          initialValues={taskToFormValues(modal.task)}
+          onSubmit={(input) => handleEdit(modal.task, input)}
+          onClose={() => setModal({ mode: 'closed' })}
+        />
+      )}
+
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Delete Task?"
+          description="This task and its checklist will be permanently deleted."
+          summary={
+            <SummaryList
+              rows={[
+                { label: 'Title', value: deleteTarget.title },
+                { label: 'Due Date', value: formatDisplayDate(deleteTarget.dueDate) },
+              ]}
+            />
+          }
+          confirmLabel="Delete"
+          danger
+          onConfirm={confirmDelete}
+          onCancel={() => setDeleteTarget(null)}
+          busy={busy}
+        />
+      )}
+    </div>
+  )
+}

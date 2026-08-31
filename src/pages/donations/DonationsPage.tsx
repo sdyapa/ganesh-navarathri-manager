@@ -8,17 +8,21 @@ import { useToast } from '@/context/ToastContext'
 import { useWhatsAppShare } from '@/hooks/useWhatsAppShare'
 import { DataTable, type DataTableColumn } from '@/components/common/DataTable'
 import { EmptyState } from '@/components/common/EmptyState'
-import { FilterBar, SearchInput, SelectFilter, DateRangeFilter } from '@/components/common/Filters'
+import { FilterBar, SearchInput, SelectFilter, SortControl, DateRangeFilter } from '@/components/common/Filters'
 import { Pagination } from '@/components/common/Pagination'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { FieldDiffList } from '@/components/common/FieldDiffList'
 import { SummaryList } from '@/components/common/SummaryList'
 import { ExportButtons } from '@/components/common/ExportButtons'
+import { CopyToYearModal, NEXT_YEAR_VALUE } from '@/components/common/CopyToYearModal'
 import { DonationForm, defaultDonationFormValues, donationToFormValues } from './DonationForm'
 import { insertDonation, updateDonation, deleteDonation } from '@/db/repositories/donations'
+import { copyDonationsToExpected } from '@/services/copyForwardService'
+import { revertDonationToExpected } from '@/services/conversionService'
+import { getOrCreateNextYearProfile } from '@/services/yearService'
 import { formatCurrency, formatCurrencyForPdf, formatNumber } from '@/lib/currency'
 import { formatDisplayDate, isDateInRange } from '@/lib/date'
-import { matchesSearch } from '@/lib/tableUtils'
+import { matchesSearch, sortByKey, type SortDirection } from '@/lib/tableUtils'
 import { diffFields } from '@/lib/diff'
 import { buildPdfReport, pdfFileName } from '@/lib/export/pdf'
 import { buildMonetaryDonationsTable, buildCommodityDonationsTable } from '@/lib/export/reportBuilders'
@@ -27,10 +31,17 @@ import { getAppSettings } from '@/db/repositories/settings'
 import type { DonationInput } from '@/lib/validation'
 import type { Donation } from '@/types'
 
-type ModalState = { mode: 'closed' } | { mode: 'add' } | { mode: 'edit'; donation: Donation }
+type ModalState = { mode: 'closed' } | { mode: 'add' } | { mode: 'edit'; donation: Donation } | { mode: 'copy' }
+
+const SORT_OPTIONS = [
+  { value: 'date-desc', label: 'Date (Newest first)' },
+  { value: 'date-asc', label: 'Date (Oldest first)' },
+  { value: 'donorName-asc', label: 'Donor (A–Z)' },
+  { value: 'donorName-desc', label: 'Donor (Z–A)' },
+]
 
 export function DonationsPage() {
-  const { currentYearId, currentYear } = useYearContext()
+  const { currentYearId, currentYear, years } = useYearContext()
   const donations = useDonations(currentYearId)
   const categories = useCategories('donation')
   const units = useUnits()
@@ -41,6 +52,8 @@ export function DonationsPage() {
   const [modal, setModal] = useState<ModalState>(searchParams.get('add') ? { mode: 'add' } : { mode: 'closed' })
   const [pendingEdit, setPendingEdit] = useState<{ donation: Donation; input: DonationInput } | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Donation | null>(null)
+  const [revertTarget, setRevertTarget] = useState<Donation | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [busy, setBusy] = useState(false)
 
   const [search, setSearch] = useState('')
@@ -48,20 +61,22 @@ export function DonationsPage() {
   const [categoryFilter, setCategoryFilter] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [sortOption, setSortOption] = useState('date-desc')
 
   const categoryName = (id: string) => categories?.find((c) => c.id === id)?.name ?? 'Uncategorized'
   const unitName = (id?: string) => units?.find((u) => u.id === id)?.name ?? ''
 
   const filtered = useMemo(() => {
     if (!donations) return []
-    return donations
+    const [sortField, sortDirection] = sortOption.split('-') as [keyof Donation, SortDirection]
+    const base = donations
       .filter((d) => (typeFilter ? d.type === typeFilter : true))
       .filter((d) => (categoryFilter ? d.categoryId === categoryFilter : true))
       .filter((d) => isDateInRange(d.date, dateFrom || undefined, dateTo || undefined))
       .filter((d) => matchesSearch([d.donorName, d.commodityName, d.notes, categoryName(d.categoryId)], search))
-      .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+    return sortByKey(base, sortField, sortDirection)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [donations, typeFilter, categoryFilter, dateFrom, dateTo, search, categories])
+  }, [donations, typeFilter, categoryFilter, dateFrom, dateTo, search, sortOption, categories])
 
   const { pageItems, page, totalPages, hasNext, hasPrev, next, prev } = usePagination(filtered, 25)
 
@@ -119,6 +134,56 @@ export function DonationsPage() {
       await deleteDonation(deleteTarget.id)
       setDeleteTarget(null)
       showToast('Donation deleted', 'info')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function confirmRevert() {
+    if (!revertTarget) return
+    setBusy(true)
+    try {
+      await revertDonationToExpected(revertTarget)
+      setRevertTarget(null)
+      showToast('Moved back to Expected Donations', 'info')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAllOnPage() {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      const allSelected = pageItems.length > 0 && pageItems.every((d) => next.has(d.id))
+      for (const d of pageItems) {
+        if (allSelected) next.delete(d.id)
+        else next.add(d.id)
+      }
+      return next
+    })
+  }
+
+  async function handleCopyToExpected(targetYearSelection: string) {
+    if (!currentYearId || !currentYear) return
+    setBusy(true)
+    try {
+      const { targetYearId, targetYearName } =
+        targetYearSelection === NEXT_YEAR_VALUE
+          ? await getOrCreateNextYearProfile(currentYearId).then((r) => ({ targetYearId: r.profile.id, targetYearName: r.profile.name }))
+          : { targetYearId: targetYearSelection, targetYearName: years.find((y) => y.id === targetYearSelection)?.name ?? 'target year' }
+      const count = await copyDonationsToExpected([...selectedIds], targetYearId)
+      setSelectedIds(new Set())
+      setModal({ mode: 'closed' })
+      showToast(`Copied ${count} donation(s) to Expected Donations in ${targetYearName}`)
     } finally {
       setBusy(false)
     }
@@ -208,6 +273,11 @@ export function DonationsPage() {
           <button type="button" className="link-button" onClick={() => shareDonation(d)}>
             Copy WhatsApp
           </button>
+          {d.sourceExpectedDonationId && (
+            <button type="button" className="link-button" onClick={() => setRevertTarget(d)}>
+              Move back to Expected
+            </button>
+          )}
         </div>
       ),
     },
@@ -259,9 +329,17 @@ export function DonationsPage() {
               options={categories.map((c) => ({ value: c.id, label: c.name }))}
             />
             <DateRangeFilter from={dateFrom} to={dateTo} onFromChange={setDateFrom} onToChange={setDateTo} />
+            <SortControl value={sortOption} onChange={setSortOption} options={SORT_OPTIONS} />
           </FilterBar>
 
-          <ExportButtons onExportPdf={handleExportPdf} onExportPng={handleExportPng} />
+          <div className="row-actions">
+            <ExportButtons onExportPdf={handleExportPdf} onExportPng={handleExportPng} />
+            {selectedIds.size > 0 && (
+              <button type="button" className="button button--secondary" onClick={() => setModal({ mode: 'copy' })}>
+                Copy {selectedIds.size} to Expected Donations
+              </button>
+            )}
+          </div>
 
           {filtered.length === 0 ? (
             <EmptyState title="No matching donations" description="Try adjusting your search or filters." />
@@ -271,6 +349,7 @@ export function DonationsPage() {
                 columns={columns}
                 data={pageItems}
                 rowKey={(d) => d.id}
+                selection={{ selectedIds, onToggle: toggleSelected, onToggleAll: toggleSelectAllOnPage }}
                 renderCard={(d) => (
                   <>
                     <div className="record-card__top">
@@ -294,6 +373,11 @@ export function DonationsPage() {
                       <button type="button" className="link-button" onClick={() => shareDonation(d)}>
                         Copy WhatsApp
                       </button>
+                      {d.sourceExpectedDonationId && (
+                        <button type="button" className="link-button" onClick={() => setRevertTarget(d)}>
+                          Move back to Expected
+                        </button>
+                      )}
                     </div>
                   </>
                 )}
@@ -328,6 +412,18 @@ export function DonationsPage() {
           categories={categories}
           units={units}
           onSubmit={(input) => handleEditSubmit(modal.donation, input)}
+          onClose={() => setModal({ mode: 'closed' })}
+        />
+      )}
+
+      {modal.mode === 'copy' && currentYear && (
+        <CopyToYearModal
+          title="Copy to Expected Donations"
+          itemLabel={`${selectedIds.size} donation(s)`}
+          sourceYear={currentYear}
+          years={years}
+          busy={busy}
+          onConfirm={handleCopyToExpected}
           onClose={() => setModal({ mode: 'closed' })}
         />
       )}
@@ -377,6 +473,29 @@ export function DonationsPage() {
           danger
           onConfirm={confirmDelete}
           onCancel={() => setDeleteTarget(null)}
+          busy={busy}
+        />
+      )}
+
+      {revertTarget && (
+        <ConfirmDialog
+          title="Move back to Expected?"
+          description="This actual donation will be deleted and the original Expected Donation it was converted from will be restored as pending."
+          summary={
+            <SummaryList
+              rows={[
+                { label: 'Donor', value: revertTarget.donorName },
+                {
+                  label: revertTarget.type === 'monetary' ? 'Amount' : 'Commodity',
+                  value: revertTarget.type === 'monetary' ? formatCurrency(revertTarget.amount) : revertTarget.commodityName ?? '',
+                },
+                { label: 'Date', value: formatDisplayDate(revertTarget.date) },
+              ]}
+            />
+          }
+          confirmLabel="Move back to Expected"
+          onConfirm={confirmRevert}
+          onCancel={() => setRevertTarget(null)}
           busy={busy}
         />
       )}

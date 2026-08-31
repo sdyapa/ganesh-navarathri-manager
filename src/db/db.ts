@@ -7,7 +7,10 @@ import type {
   ExpectedDonation,
   ExpectedExpense,
   Expense,
+  KeyEvent,
+  PoojaAssignment,
   Profile,
+  Task,
   Unit,
   YearProfile,
 } from '@/types'
@@ -26,6 +29,9 @@ export class AppDatabase extends Dexie {
   categories!: Table<Category, string>
   units!: Table<Unit, string>
   profiles!: Table<Profile, string>
+  tasks!: Table<Task, string>
+  keyEvents!: Table<KeyEvent, string>
+  poojaAssignments!: Table<PoojaAssignment, string>
   appSettings!: Table<AppSettings, string>
 
   constructor() {
@@ -55,6 +61,13 @@ export class AppDatabase extends Dexie {
     // the new table needs declaring here, unchanged tables from v2 carry forward automatically.
     this.version(3).stores({
       profiles: 'id, kind, order',
+    })
+    // v4: Tasks/TODOs and the festival calendar (Key Events + daily Pooja roster) — three new
+    // tables, one version bump, same precedent as v3's profiles table.
+    this.version(4).stores({
+      tasks: 'id, yearProfileId, dueDate, done',
+      keyEvents: 'id, yearProfileId, date',
+      poojaAssignments: 'id, yearProfileId, date',
     })
   }
 }

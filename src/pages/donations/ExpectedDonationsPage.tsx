@@ -8,7 +8,7 @@ import { useWhatsAppShare } from '@/hooks/useWhatsAppShare'
 import { DataTable, type DataTableColumn } from '@/components/common/DataTable'
 import { SectionTabs } from '@/components/common/SectionTabs'
 import { EmptyState } from '@/components/common/EmptyState'
-import { FilterBar, SearchInput, SelectFilter } from '@/components/common/Filters'
+import { FilterBar, SearchInput, SelectFilter, SortControl } from '@/components/common/Filters'
 import { Pagination } from '@/components/common/Pagination'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { SummaryList } from '@/components/common/SummaryList'
@@ -22,7 +22,7 @@ import {
 import { convertExpectedDonationToDonation } from '@/services/conversionService'
 import { formatCurrency, formatNumber } from '@/lib/currency'
 import { formatDisplayDate, todayDateOnly } from '@/lib/date'
-import { matchesSearch } from '@/lib/tableUtils'
+import { matchesSearch, sortByKey, type SortDirection } from '@/lib/tableUtils'
 import { diffFields } from '@/lib/diff'
 import type { DonationInput } from '@/lib/validation'
 import type { ExpectedDonation } from '@/types'
@@ -32,6 +32,13 @@ type ModalState =
   | { mode: 'add' }
   | { mode: 'edit'; record: ExpectedDonation }
   | { mode: 'convert'; record: ExpectedDonation }
+
+const SORT_OPTIONS = [
+  { value: 'date-desc', label: 'Expected Date (Newest first)' },
+  { value: 'date-asc', label: 'Expected Date (Oldest first)' },
+  { value: 'donorName-asc', label: 'Donor (A–Z)' },
+  { value: 'donorName-desc', label: 'Donor (Z–A)' },
+]
 
 export function ExpectedDonationsPage() {
   const { currentYearId } = useYearContext()
@@ -48,17 +55,19 @@ export function ExpectedDonationsPage() {
   const [busy, setBusy] = useState(false)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('pending')
+  const [sortOption, setSortOption] = useState('date-desc')
 
   const categoryName = (id: string) => categories?.find((c) => c.id === id)?.name ?? 'Uncategorized'
   const unitName = (id?: string) => units?.find((u) => u.id === id)?.name ?? ''
 
   const filtered = useMemo(() => {
     if (!records) return []
-    return records
+    const [sortField, sortDirection] = sortOption.split('-') as [keyof ExpectedDonation, SortDirection]
+    const base = records
       .filter((d) => (statusFilter ? d.status === statusFilter : true))
       .filter((d) => matchesSearch([d.donorName, d.commodityName, d.notes], search))
-      .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
-  }, [records, statusFilter, search])
+    return sortByKey(base, sortField, sortDirection)
+  }, [records, statusFilter, search, sortOption])
 
   const { pageItems, page, totalPages, hasNext, hasPrev, next, prev } = usePagination(filtered, 25)
 
@@ -204,6 +213,7 @@ export function ExpectedDonationsPage() {
                 { value: 'converted', label: 'Converted' },
               ]}
             />
+            <SortControl value={sortOption} onChange={setSortOption} options={SORT_OPTIONS} />
           </FilterBar>
 
           {filtered.length === 0 ? (

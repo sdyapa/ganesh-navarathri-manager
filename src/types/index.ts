@@ -70,6 +70,11 @@ export interface Expense extends BaseRecord {
    *  description, so this must stay optional for every pre-existing record to remain valid. */
   vendorName?: string
   sourceExpectedExpenseId?: string | null
+  /** Free-text label for grouping split payments (advance/part/final) to the same vendor in
+   *  the Expenses list view — purely visual, deliberately not referenced by calculations,
+   *  reportBuilders, pdf.ts, or png.ts, so totals/reports/exports are unaffected. Not present
+   *  on ExpectedExpense — grouping split payments only makes sense once they're actual. */
+  paymentGroup?: string
 }
 
 export interface ExpectedExpense extends BaseRecord {
@@ -125,6 +130,55 @@ export interface Profile {
   kind: ProfileKind
   name: string
   order: number
+}
+
+export interface TaskChecklistItem {
+  id: string
+  label: string
+  done: boolean
+}
+
+/** A TODO with a due date (e.g. "Book priest by 10-Sep") — year-scoped like everything else in
+ *  the app, since a task only means something for one specific festival occurrence. checklist
+ *  is stored as an embedded array rather than its own table: it's never queried independently
+ *  of its task, so a separate table would just be complexity with no benefit. */
+export interface Task {
+  id: string
+  yearProfileId: string
+  title: string
+  dueDate: DateOnly
+  notes?: string
+  done: boolean
+  checklist: TaskChecklistItem[]
+  createdAt: IsoTimestamp
+  updatedAt: IsoTimestamp
+}
+
+/** A named, dated festival milestone (Annadanam, Nimajjanam/idol immersion, Kumkumarchana,
+ *  etc.) — freely named rather than a fixed enum, since which of these apply (and when) varies
+ *  year to year. */
+export interface KeyEvent {
+  id: string
+  yearProfileId: string
+  name: string
+  date: DateOnly
+  notes?: string
+  createdAt: IsoTimestamp
+  updatedAt: IsoTimestamp
+}
+
+/** Which family/families performed pooja on a given day, up to immersion day — one entry per
+ *  day. familyNames is plain free text (e.g. "Sharma family, Reddy family") rather than a
+ *  multi-select of Profiles: supporting one-or-more names for a field filled in once a day for
+ *  a few weeks a year isn't worth a dedicated multi-tag/multi-autocomplete input. */
+export interface PoojaAssignment {
+  id: string
+  yearProfileId: string
+  date: DateOnly
+  familyNames: string
+  notes?: string
+  createdAt: IsoTimestamp
+  updatedAt: IsoTimestamp
 }
 
 export interface WhatsAppTemplates {
@@ -204,6 +258,9 @@ export interface YearProfileBundle {
   expenses: Expense[]
   expectedExpenses: ExpectedExpense[]
   auctions: Auction[]
+  tasks: Task[]
+  keyEvents: KeyEvent[]
+  poojaAssignments: PoojaAssignment[]
 }
 
 export interface BackupFile {

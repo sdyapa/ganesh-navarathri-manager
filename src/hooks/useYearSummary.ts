@@ -60,22 +60,15 @@ export function useYearSummary() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, donations, units])
 
+  // Auction proceeds are deliberately NOT folded in here — they aren't collected donation
+  // revenue yet, only a pledge for next year (see FinancialSummary's doc comments; matches the
+  // identical fix in ReportsPage.tsx's own category-totals computation).
   const donationCategoryTotals = useMemo(() => {
     if (loading) return []
     const monetary = donations!.filter((d) => d.type === 'monetary')
-    const auctionAsCategory = auctions!.map((a) => ({ categoryId: '__auction__', amount: a.amount }))
-    const combined = computeCategoryTotals(monetary, donationCategories!)
-    if (auctionAsCategory.length > 0) {
-      combined.push({
-        categoryId: '__auction__',
-        categoryName: 'Auction',
-        total: auctionAsCategory.reduce((s, a) => s + a.amount, 0),
-        count: auctionAsCategory.length,
-      })
-    }
-    return combined.sort((a, b) => b.total - a.total)
+    return computeCategoryTotals(monetary, donationCategories!)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, donations, auctions, donationCategories])
+  }, [loading, donations, donationCategories])
 
   const expenseCategoryTotals = useMemo(() => {
     if (loading) return []

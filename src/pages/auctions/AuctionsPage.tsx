@@ -6,7 +6,7 @@ import { usePagination } from '@/hooks/usePagination'
 import { useToast } from '@/context/ToastContext'
 import { DataTable, type DataTableColumn } from '@/components/common/DataTable'
 import { EmptyState } from '@/components/common/EmptyState'
-import { FilterBar, SearchInput, DateRangeFilter } from '@/components/common/Filters'
+import { FilterBar, SearchInput, DateRangeFilter, SortControl } from '@/components/common/Filters'
 import { Pagination } from '@/components/common/Pagination'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { FieldDiffList } from '@/components/common/FieldDiffList'
@@ -20,7 +20,7 @@ import { getOrCreateNextYearProfile } from '@/services/yearService'
 import { convertAuctionToExpectedDonation } from '@/services/conversionService'
 import { formatCurrency, formatCurrencyForPdf } from '@/lib/currency'
 import { formatDisplayDate, isDateInRange, todayDateOnly } from '@/lib/date'
-import { matchesSearch } from '@/lib/tableUtils'
+import { matchesSearch, sortByKey, type SortDirection } from '@/lib/tableUtils'
 import { diffFields } from '@/lib/diff'
 import { buildPdfReport, pdfFileName } from '@/lib/export/pdf'
 import { buildAuctionsTable } from '@/lib/export/reportBuilders'
@@ -34,6 +34,13 @@ type ModalState =
   | { mode: 'add' }
   | { mode: 'edit'; auction: Auction }
   | { mode: 'convert'; auction: Auction }
+
+const SORT_OPTIONS = [
+  { value: 'date-desc', label: 'Date (Newest first)' },
+  { value: 'date-asc', label: 'Date (Oldest first)' },
+  { value: 'amount-desc', label: 'Amount (High to Low)' },
+  { value: 'amount-asc', label: 'Amount (Low to High)' },
+]
 
 function findSourceYear(auction: Auction, years: YearProfile[]): YearProfile | undefined {
   return years.find((y) => y.id === auction.yearProfileId)
@@ -84,14 +91,16 @@ export function AuctionsPage() {
   const [search, setSearch] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  const [sortOption, setSortOption] = useState('date-desc')
 
   const filtered = useMemo(() => {
     if (!auctions) return []
-    return auctions
+    const [sortField, sortDirection] = sortOption.split('-') as [keyof Auction, SortDirection]
+    const base = auctions
       .filter((a) => isDateInRange(a.date, dateFrom || undefined, dateTo || undefined))
       .filter((a) => matchesSearch([a.item, a.person, a.notes], search))
-      .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
-  }, [auctions, dateFrom, dateTo, search])
+    return sortByKey(base, sortField, sortDirection)
+  }, [auctions, dateFrom, dateTo, search, sortOption])
 
   const { pageItems, page, totalPages, hasNext, hasPrev, next, prev } = usePagination(filtered, 25)
 
@@ -257,6 +266,7 @@ export function AuctionsPage() {
           <FilterBar>
             <SearchInput value={search} onChange={setSearch} placeholder="Search item, person, notes…" />
             <DateRangeFilter from={dateFrom} to={dateTo} onFromChange={setDateFrom} onToChange={setDateTo} />
+            <SortControl value={sortOption} onChange={setSortOption} options={SORT_OPTIONS} />
           </FilterBar>
 
           <ExportButtons onExportPdf={handleExportPdf} onExportPng={handleExportPng} />
