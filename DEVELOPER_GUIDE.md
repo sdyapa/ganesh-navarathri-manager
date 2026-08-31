@@ -410,6 +410,19 @@ Two small, reused patterns worth knowing before adding a new form:
   `update<Entity>()`. If `diffFields` finds zero changes, the modal just closes with no confirm
   step and no DB write.
 
+  > **One dialog at a time, not two stacked.** `handleEditSubmit` calls `setModal({ mode:
+  > 'closed' })` in the same breath as `setPendingEdit(...)` — the edit form's `Modal` unmounts
+  > the instant the confirm step takes over, rather than staying open (dimmed) underneath the
+  > `<ConfirmDialog>`. Earlier this stacked two near-identical-looking dialogs — both titled
+  > around "Save Changes" — which a real user reported as the app "getting stuck" (nothing
+  > *was* stuck; the second, actually-actionable dialog was just easy to miss/misread as a
+  > duplicate of the first). Fixed by (1) closing the edit form on handoff, so only the confirm
+  > dialog is ever visible, and (2) relabeling the two steps distinctly — the edit form's submit
+  > button reads **"Review Changes"**, the confirm dialog's reads **"Confirm & Save"** — instead
+  > of both saying "Save Changes". Apply the same pair (`setModal({mode:'closed'})` +
+  > `setPendingEdit(...)` together, "Review Changes" / "Confirm & Save" labels) to any new
+  > edit-with-confirm flow.
+
 ### 3.5 `Modal.tsx`'s Focus-Management Fix
 
 Worth knowing if you ever touch `components/common/Modal.tsx`: its focus-trap `useEffect`
