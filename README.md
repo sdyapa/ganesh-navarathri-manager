@@ -1,5 +1,9 @@
 # Ganesh Navarathri Manager
 
+> **Developing or extending this app?** See [`DEVELOPER_GUIDE.md`](DEVELOPER_GUIDE.md) — a
+> code-facing companion to this README that maps every feature below to the exact files that
+> implement it.
+
 A donation and expense management web app for Ganesh Navarathri celebrations — built to run
 entirely as a **static site** (GitHub Pages friendly), work **offline**, and track finances
 **year after year** without ever mixing one year's data into another.
@@ -448,8 +452,12 @@ handling goes through `src/lib/date.ts`, which builds `Date` objects only from e
 
 ## 11. Project Structure
 
+See [`DEVELOPER_GUIDE.md`](DEVELOPER_GUIDE.md) for a detailed feature-to-file map going one level
+deeper than the folder overview below.
+
 ```
 backups/            Year-by-year archive of exported backup JSON files (see backups/README.md)
+DEVELOPER_GUIDE.md   Code-facing companion to this README — maps every feature to its files
 src/
   types/            Domain types + backup file format
   lib/               Pure, unit-tested logic: calculations, validation, date/currency
