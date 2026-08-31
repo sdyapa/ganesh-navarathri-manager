@@ -414,16 +414,28 @@ Scoped to Donations/Expenses/Auctions only; Tasks/Calendar don't have a Duplicat
 `[data-theme="dark"]` — this is exactly what the export functions in `lib/export/png.ts` rely on
 (see below) to force a subtree back to light regardless of the app's active theme.
 
-**Two hardcoded-color gotchas already fixed while building this** (both patterns to remember if
-you add more theme-varying UI):
+**Three hardcoded-color gotchas already fixed while building this** (patterns to remember if you
+add more theme-varying UI):
 
-1. **`.toast`'s background was `var(--color-text)`** — a deliberate light-mode trick reusing
+1. **Native form controls (`input`/`select`/`textarea`) never had an explicit background/text
+   color at all** — they just rendered with the browser's own default light appearance, which
+   happened to look fine against the light theme by coincidence but stayed permanently white
+   once dark mode existed (a real bug a user hit immediately: "input boxes are white ... makes
+   form filling difficult"). Two-part fix: (a) `color-scheme: light`/`color-scheme: dark` added
+   to the `:root`/`[data-theme="light"]`/`[data-theme="dark"]` blocks, which tells the browser to
+   theme *native, unstyled* UI chrome — the date-picker popup, its calendar icon, checkboxes,
+   scrollbars — that this CSS otherwise can't reach at all; (b) every rule that styles a form
+   control (`.form-field input/select/textarea`, `.filter-field input/select`, `.inline-form
+   input/select`, `.whatsapp-editor-grid textarea`, `.year-switcher select`) got an explicit
+   `background: var(--color-surface); color: var(--color-text);` so they match this app's exact
+   palette rather than the browser's generic dark gray. Don't add a new input rule without both.
+2. **`.toast`'s background was `var(--color-text)`** — a deliberate light-mode trick reusing
    "always near-black" for a dark chip background, which breaks the instant `--color-text`
    becomes near-white in dark mode. Fixed by hardcoding the toast to a fixed, theme-independent
    dark color instead (a toast is meant to look the same dark overlay chip in both themes, like
    most apps' snackbars) — don't reuse a semantic color token for an incidental "happens to be
    dark" purpose.
-2. **`color` is inherited, custom properties are not retroactive** — `lib/export/png.ts`
+3. **`color` is inherited, custom properties are not retroactive** — `lib/export/png.ts`
    originally forced exports back to light with `element.setAttribute('data-theme', 'light')`
    alone. That correctly re-scopes any CSS rule that freshly reads `var(--color-*)` *within* the
    subtree (e.g. `.data-table thead th`'s `color: var(--color-primary-dark)`), but plain
@@ -442,7 +454,7 @@ confirming the row text is legible dark-on-white, not near-invisible):
   render identically in both themes.
 - `lib/export/png.ts`'s `exportElementAsPng` and `exportTableReportAsPng` both set
   `data-theme="light"` **and** an explicit `color` override on the captured element/container
-  (see gotcha #2 above), restoring the original values in a `finally` block afterward.
+  (see gotcha #3 above), restoring the original values in a `finally` block afterward.
 
 ## 3. Cross-Cutting Systems
 

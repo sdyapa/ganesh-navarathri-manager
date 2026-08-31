@@ -24,6 +24,10 @@
    of the app's active theme. */
 :root,
 [data-theme='light'] {
+  /* Tells the browser which palette native, unstyled UI chrome (date/time picker popups,
+     scrollbars, the default checkbox tick) should use — without this, that chrome stays
+     permanently light regardless of any of the dark overrides below. */
+  color-scheme: light;
   --color-primary: #ea580c;
   --color-primary-dark: #c2410c;
   --color-primary-light: #fff7ed;
@@ -51,6 +55,7 @@
    Dark theme
    ========================================================================== */
 [data-theme='dark'] {
+  color-scheme: dark;
   --color-primary: #f97316;
   --color-primary-dark: #fdba74;
   --color-primary-light: #431407;
@@ -172,6 +177,7 @@ ul { list-style: none; margin: 0; padding: 0; }
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
   background: var(--color-surface);
+  color: var(--color-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -427,6 +433,8 @@ ul { list-style: none; margin: 0; padding: 0; }
   padding: 8px 10px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
   min-width: 140px;
 }
 .filter-field--search { flex: 1 1 200px; }
@@ -501,6 +509,8 @@ ul { list-style: none; margin: 0; padding: 0; }
   padding: 10px 12px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
   width: 100%;
   min-height: 42px;
 }
@@ -634,13 +644,13 @@ ul { list-style: none; margin: 0; padding: 0; }
 .manage-list__label { font-weight: 600; display: flex; gap: 6px; align-items: center; }
 
 .inline-form { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; }
-.inline-form input, .inline-form select { padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--color-border); }
+.inline-form input, .inline-form select { padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text); }
 
 .whatsapp-editor-grid { display: grid; grid-template-columns: 1fr; gap: var(--space-4); }
 @media (min-width: 860px) {
   .whatsapp-editor-grid { grid-template-columns: 1fr 1fr; }
 }
-.whatsapp-editor-grid textarea { width: 100%; font-family: ui-monospace, monospace; font-size: 0.82rem; padding: var(--space-3); border-radius: var(--radius-sm); border: 1px solid var(--color-border); }
+.whatsapp-editor-grid textarea { width: 100%; font-family: ui-monospace, monospace; font-size: 0.82rem; padding: var(--space-3); border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text); }
 .whatsapp-preview {
   white-space: pre-wrap;
   background: var(--color-muted-bg);
