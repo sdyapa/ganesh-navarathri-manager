@@ -111,6 +111,10 @@ export function DonationsPage() {
       setModal({ mode: 'closed' })
       return
     }
+    // Close the edit form the moment we hand off to the confirm step — showing the confirm
+    // dialog stacked ON TOP of the still-open edit form (two look-alike dialogs, one dimmed
+    // behind the other) reads as the app being stuck rather than as "one more step needed".
+    setModal({ mode: 'closed' })
     setPendingEdit({ donation: original, input })
   }
 
@@ -407,7 +411,7 @@ export function DonationsPage() {
       {modal.mode === 'edit' && (
         <DonationForm
           title="Edit Donation"
-          submitLabel="Save Changes"
+          submitLabel="Review Changes"
           initialValues={donationToFormValues(modal.donation)}
           categories={categories}
           units={units}
@@ -430,7 +434,8 @@ export function DonationsPage() {
 
       {pendingEdit && (
         <ConfirmDialog
-          title="Confirm Changes"
+          title="Review & Confirm"
+          description="Check the changes below, then confirm to save them. Cancel to go back without saving."
           summary={
             <FieldDiffList
               changes={diffFields([
@@ -441,7 +446,7 @@ export function DonationsPage() {
               ])}
             />
           }
-          confirmLabel="Save Changes"
+          confirmLabel="Confirm & Save"
           onConfirm={confirmEdit}
           onCancel={() => setPendingEdit(null)}
           busy={busy}

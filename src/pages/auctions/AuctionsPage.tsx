@@ -131,6 +131,9 @@ export function AuctionsPage() {
       setModal({ mode: 'closed' })
       return
     }
+    // Close the edit form the moment we hand off to the confirm step — see DonationsPage.tsx's
+    // identical comment for why (stacked look-alike dialogs read as the app being stuck).
+    setModal({ mode: 'closed' })
     setPendingEdit({ auction: original, input })
   }
 
@@ -330,7 +333,7 @@ export function AuctionsPage() {
       {modal.mode === 'edit' && (
         <AuctionForm
           title="Edit Auction Entry"
-          submitLabel="Save Changes"
+          submitLabel="Review Changes"
           initialValues={auctionToFormValues(modal.auction)}
           onSubmit={(input) => handleEditSubmit(modal.auction, input)}
           onClose={() => setModal({ mode: 'closed' })}
@@ -352,7 +355,8 @@ export function AuctionsPage() {
 
       {pendingEdit && (
         <ConfirmDialog
-          title="Confirm Changes"
+          title="Review & Confirm"
+          description="Check the changes below, then confirm to save them. Cancel to go back without saving."
           summary={
             <FieldDiffList
               changes={diffFields([
@@ -363,7 +367,7 @@ export function AuctionsPage() {
               ])}
             />
           }
-          confirmLabel="Save Changes"
+          confirmLabel="Confirm & Save"
           onConfirm={confirmEdit}
           onCancel={() => setPendingEdit(null)}
           busy={busy}

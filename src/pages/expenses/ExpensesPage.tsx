@@ -127,6 +127,9 @@ export function ExpensesPage() {
       setModal({ mode: 'closed' })
       return
     }
+    // Close the edit form the moment we hand off to the confirm step — see DonationsPage.tsx's
+    // identical comment for why (stacked look-alike dialogs read as the app being stuck).
+    setModal({ mode: 'closed' })
     setPendingEdit({ expense: original, input })
   }
 
@@ -417,7 +420,7 @@ export function ExpensesPage() {
       {modal.mode === 'edit' && (
         <ExpenseForm
           title="Edit Expense"
-          submitLabel="Save Changes"
+          submitLabel="Review Changes"
           initialValues={expenseToFormValues(modal.expense)}
           categories={categories}
           paymentGroupOptions={paymentGroupOptions}
@@ -440,7 +443,8 @@ export function ExpensesPage() {
 
       {pendingEdit && (
         <ConfirmDialog
-          title="Confirm Changes"
+          title="Review & Confirm"
+          description="Check the changes below, then confirm to save them. Cancel to go back without saving."
           summary={
             <FieldDiffList
               changes={diffFields([
@@ -453,7 +457,7 @@ export function ExpensesPage() {
               ])}
             />
           }
-          confirmLabel="Save Changes"
+          confirmLabel="Confirm & Save"
           onConfirm={confirmEdit}
           onCancel={() => setPendingEdit(null)}
           busy={busy}
