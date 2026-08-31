@@ -1,0 +1,947 @@
+{
+  "appName": "Ganesh Navarathri Manager",
+  "appVersion": "1.0.0",
+  "backupVersion": 1,
+  "exportType": "full",
+  "exportedAt": "2026-08-31T06:28:54.975Z",
+  "years": [
+    {
+      "profile": {
+        "id": "legacy-year-2025",
+        "year": 2025,
+        "name": "Ganesh Navarathri 2025",
+        "openingBalance": 0,
+        "carryForward": false,
+        "status": "active",
+        "createdAt": "2026-08-31T06:28:54.975Z",
+        "updatedAt": "2026-08-31T06:28:54.975Z"
+      },
+      "donations": [
+        {
+          "id": "legacy-donation-1",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-17",
+          "categoryId": "legacy-cat-donation-Auction",
+          "donorName": "Naresh Yadav",
+          "type": "monetary",
+          "amount": 42200,
+          "notes": "2024 Chinna laddu",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-donation-2",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-17",
+          "categoryId": "legacy-cat-donation-Auction",
+          "donorName": "Sreenath Sagar",
+          "type": "monetary",
+          "amount": 10116,
+          "notes": "2024 Pattu pancha",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-donation-3",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-17",
+          "categoryId": "legacy-cat-donation-Chanda",
+          "donorName": "Ramesh Goud",
+          "type": "monetary",
+          "amount": 10000,
+          "notes": "Vigraham Contribution",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-donation-4",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-20",
+          "categoryId": "legacy-cat-donation-Auction",
+          "donorName": "Ramesh Goud",
+          "type": "monetary",
+          "amount": 40116,
+          "notes": "2024 Pedda Laddu amount",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-donation-5",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-23",
+          "categoryId": "legacy-cat-donation-Auction",
+          "donorName": "Ramesh Yadav",
+          "type": "monetary",
+          "amount": 25116,
+          "notes": "2024 Kalasam amount",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-donation-6",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-25",
+          "categoryId": "legacy-cat-donation-Chanda",
+          "donorName": "Ganesh V",
+          "type": "monetary",
+          "amount": 3000,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-donation-7",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-27",
+          "categoryId": "legacy-cat-donation-Chanda",
+          "donorName": "Lokesh Goud",
+          "type": "monetary",
+          "amount": 5000,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-donation-8",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-27",
+          "categoryId": "legacy-cat-donation-Chanda",
+          "donorName": "Mallesh Yadav",
+          "type": "monetary",
+          "amount": 3000,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-donation-9",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-27",
+          "categoryId": "legacy-cat-donation-Chanda",
+          "donorName": "Nagabushanam",
+          "type": "monetary",
+          "amount": 5000,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-donation-10",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-27",
+          "categoryId": "legacy-cat-donation-Chanda",
+          "donorName": "Nagoor A",
+          "type": "monetary",
+          "amount": 5000,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-donation-11",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-28",
+          "categoryId": "legacy-cat-donation-Chanda",
+          "donorName": "Paandu J",
+          "type": "monetary",
+          "amount": 3000,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-donation-12",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-28",
+          "categoryId": "legacy-cat-donation-Chanda",
+          "donorName": "Shiva",
+          "type": "monetary",
+          "amount": 2000,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-donation-13",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-09-02",
+          "categoryId": "legacy-cat-donation-Chanda",
+          "donorName": "Srinivas Reddy",
+          "type": "monetary",
+          "amount": 5000,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-donation-14",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-09-03",
+          "categoryId": "legacy-cat-donation-Chanda",
+          "donorName": "Shiva Reddy G",
+          "type": "monetary",
+          "amount": 2016,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-donation-15",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-09-04",
+          "categoryId": "legacy-cat-donation-Chanda",
+          "donorName": "Shekar Goud O",
+          "type": "monetary",
+          "amount": 5000,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-donation-16",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-09-04",
+          "categoryId": "legacy-cat-donation-Chanda",
+          "donorName": "Narayana Reddy Gaddam",
+          "type": "monetary",
+          "amount": 5000,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-donation-17",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-09-05",
+          "categoryId": "legacy-cat-donation-Chanda",
+          "donorName": "Ravinder Reddy",
+          "type": "monetary",
+          "amount": 1000,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-donation-18",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-09-06",
+          "categoryId": "legacy-cat-donation-Chanda",
+          "donorName": "Laxman A",
+          "type": "monetary",
+          "amount": 5000,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-donation-19",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-09-06",
+          "categoryId": "legacy-cat-donation-Chanda",
+          "donorName": "Mahendra",
+          "type": "monetary",
+          "amount": 2000,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        }
+      ],
+      "expectedDonations": [
+        {
+          "id": "legacy-expdonation-c-1",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-20",
+          "categoryId": "legacy-cat-donation-Annadanam",
+          "donorName": "Nagabushanam",
+          "type": "commodity",
+          "commodityName": "Rice",
+          "quantity": 25,
+          "unitId": "legacy-unit-Kg",
+          "status": "pending",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        }
+      ],
+      "expenses": [
+        {
+          "id": "legacy-expense-1",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-17",
+          "categoryId": "legacy-cat-expense-Initial Setup",
+          "description": "Sound system",
+          "amount": 42800,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-2",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-17",
+          "categoryId": "legacy-cat-expense-Initial Setup",
+          "description": "Sound system transportation",
+          "amount": 850,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-3",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-17",
+          "categoryId": "legacy-cat-expense-Initial Setup",
+          "description": "Vigraham",
+          "amount": 16200,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-4",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-17",
+          "categoryId": "legacy-cat-expense-Initial Setup",
+          "description": "Vigraham Transportation",
+          "amount": 1000,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-5",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-20",
+          "categoryId": "legacy-cat-expense-Initial Setup",
+          "description": "Ganesh Mandapam",
+          "amount": 20000,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-6",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-20",
+          "categoryId": "legacy-cat-expense-Initial Setup",
+          "description": "Nylon Rope",
+          "amount": 150,
+          "notes": "For mandapam",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-7",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-22",
+          "categoryId": "legacy-cat-expense-Initial Setup",
+          "description": "Centring molalu",
+          "amount": 200,
+          "notes": "For Ganesh mandapam",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-8",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-22",
+          "categoryId": "legacy-cat-expense-Initial Setup",
+          "description": "Centring",
+          "amount": 9000,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-9",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-22",
+          "categoryId": "legacy-cat-expense-Initial Setup",
+          "description": "Centring Inaam",
+          "amount": 200,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-10",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-23",
+          "categoryId": "legacy-cat-expense-Nimajjanam",
+          "description": "Band",
+          "amount": 5000,
+          "notes": "Advance",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-11",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-23",
+          "categoryId": "legacy-cat-expense-Pooja Items",
+          "description": "Pattu Pancha, towels and blouse pieces",
+          "amount": 2380,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-12",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-24",
+          "categoryId": "legacy-cat-expense-Pooja Items",
+          "description": "Pooja saman",
+          "amount": 3850,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-13",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-24",
+          "categoryId": "legacy-cat-expense-Initial Setup",
+          "description": "Decoration items",
+          "amount": 4100,
+          "notes": "Thoranalu, Jandalu and Kolatam sticks",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-14",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-27",
+          "categoryId": "legacy-cat-expense-Initial Setup",
+          "description": "Binding wire",
+          "amount": 30,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-15",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-27",
+          "categoryId": "legacy-cat-expense-Initial Setup",
+          "description": "Cloth",
+          "amount": 360,
+          "notes": "Orange and white cloth",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-16",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-27",
+          "categoryId": "legacy-cat-expense-Pooja Items",
+          "description": "Pathri, Fruits and flowers",
+          "amount": 2720,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-17",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-27",
+          "categoryId": "legacy-cat-expense-Initial Setup",
+          "description": "Flexi",
+          "amount": 1000,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-18",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-27",
+          "categoryId": "legacy-cat-expense-Initial Setup",
+          "description": "Carpet",
+          "amount": 600,
+          "notes": "Green carpet",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-19",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-27",
+          "categoryId": "legacy-cat-expense-Initial Setup",
+          "description": "Molalu for table",
+          "amount": 60,
+          "notes": "For Round table",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-20",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-27",
+          "categoryId": "legacy-cat-expense-Initial Setup",
+          "description": "Police Patrolling",
+          "amount": 1000,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-21",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-27",
+          "categoryId": "legacy-cat-expense-Initial Setup",
+          "description": "Karralu",
+          "amount": 500,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-22",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-27",
+          "categoryId": "legacy-cat-expense-Initial Setup",
+          "description": "Laddu",
+          "amount": 3300,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-23",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-27",
+          "categoryId": "legacy-cat-expense-Initial Setup",
+          "description": "Electrical items",
+          "amount": 1000,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-24",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-27",
+          "categoryId": "legacy-cat-expense-Initial Setup",
+          "description": "Pins, lock, bulb and remote battery",
+          "amount": 130,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-25",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-27",
+          "categoryId": "legacy-cat-expense-Pooja Items",
+          "description": "Rice and water glasses",
+          "amount": 330,
+          "notes": "Rice 300, glasses 30",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-26",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-28",
+          "categoryId": "legacy-cat-expense-Pooja Items",
+          "description": "Trash covers",
+          "amount": 100,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-27",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-08-18",
+          "categoryId": "legacy-cat-expense-Initial Setup",
+          "description": "Current board",
+          "amount": 180,
+          "notes": "Board and mcb box",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-28",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-09-02",
+          "categoryId": "legacy-cat-expense-Initial Setup",
+          "description": "Police Patrolling 2",
+          "amount": 1000,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-29",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-09-02",
+          "categoryId": "legacy-cat-expense-Pooja Items",
+          "description": "Deepam oil",
+          "amount": 150,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-30",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-09-03",
+          "categoryId": "legacy-cat-expense-Pooja Items",
+          "description": "Deepam oil",
+          "amount": 436,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-31",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-09-04",
+          "categoryId": "legacy-cat-expense-Pooja Items",
+          "description": "Water and paper plates",
+          "amount": 45,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-32",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-09-05",
+          "categoryId": "legacy-cat-expense-Nimajjanam",
+          "description": "Srinivasa",
+          "amount": 1542,
+          "notes": "Items for pulihora",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-33",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-09-06",
+          "categoryId": "legacy-cat-expense-Pooja Items",
+          "description": "Last Day Flowers",
+          "amount": 580,
+          "notes": "Danda and loose flowers",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-34",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-09-06",
+          "categoryId": "legacy-cat-expense-Nimajjanam",
+          "description": "Kurta and shawls",
+          "amount": 6200,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-35",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-09-06",
+          "categoryId": "legacy-cat-expense-Nimajjanam",
+          "description": "Gummadi kayalu",
+          "amount": 240,
+          "notes": "2 units",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-36",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-09-06",
+          "categoryId": "legacy-cat-expense-Nimajjanam",
+          "description": "Kanduvalu",
+          "amount": 900,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-37",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-09-06",
+          "categoryId": "legacy-cat-expense-Pooja Items",
+          "description": "Kobbari kayalu",
+          "amount": 175,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-38",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-09-06",
+          "categoryId": "legacy-cat-expense-Nimajjanam",
+          "description": "Oil and covers",
+          "amount": 125,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-39",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-09-06",
+          "categoryId": "legacy-cat-expense-Nimajjanam",
+          "description": "Cool drinks and glasses",
+          "amount": 590,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-40",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-09-06",
+          "categoryId": "legacy-cat-expense-Pooja Items",
+          "description": "Panthulu Santosh",
+          "amount": 10000,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-41",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-09-06",
+          "categoryId": "legacy-cat-expense-Nimajjanam",
+          "description": "Bhajji",
+          "amount": 300,
+          "notes": "Mirchi bhajji",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-42",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-09-06",
+          "categoryId": "legacy-cat-expense-Nimajjanam",
+          "description": "Nimajjanam batha",
+          "amount": 300,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-43",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-09-06",
+          "categoryId": "legacy-cat-expense-Nimajjanam",
+          "description": "Wines for band, water and stuff",
+          "amount": 2000,
+          "notes": "@Srinu Anna",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-44",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-09-06",
+          "categoryId": "legacy-cat-expense-Nimajjanam",
+          "description": "Paper plates, cups and sutthil thadu",
+          "amount": 200,
+          "notes": "@Ramesh Anna",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-45",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-09-06",
+          "categoryId": "legacy-cat-expense-Nimajjanam",
+          "description": "Band",
+          "amount": 21000,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expense-46",
+          "yearProfileId": "legacy-year-2025",
+          "date": "2025-09-06",
+          "categoryId": "legacy-cat-expense-Nimajjanam",
+          "description": "Vehicle for nimajjanam",
+          "amount": 1000,
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        }
+      ],
+      "expectedExpenses": [],
+      "auctions": [
+        {
+          "id": "legacy-auction-1",
+          "yearProfileId": "legacy-year-2025",
+          "item": "Pedda Laddu",
+          "person": "Chandra Shekar Goud Origanti",
+          "amount": 42116,
+          "date": "2025-09-06",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-auction-2",
+          "yearProfileId": "legacy-year-2025",
+          "item": "Chinna Laddu",
+          "person": "Nagabushanam Nellikanti",
+          "amount": 30116,
+          "date": "2025-09-06",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-auction-3",
+          "yearProfileId": "legacy-year-2025",
+          "item": "Kalasam",
+          "person": "Venkateshwar Reddy K",
+          "amount": 41116,
+          "date": "2025-09-06",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-auction-4",
+          "yearProfileId": "legacy-year-2025",
+          "item": "Hundi",
+          "person": "Lokesh Goud Veeramalla",
+          "amount": 4216,
+          "date": "2025-09-06",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-auction-5",
+          "yearProfileId": "legacy-year-2025",
+          "item": "Pattu Vasthralu",
+          "person": "Krishna Sagar Dyapa",
+          "amount": 21116,
+          "date": "2025-09-06",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        }
+      ]
+    },
+    {
+      "profile": {
+        "id": "legacy-year-2026-placeholder",
+        "year": 2026,
+        "name": "Ganesh Navarathri 2026",
+        "openingBalance": 0,
+        "carryForward": false,
+        "status": "active",
+        "createdAt": "2026-08-31T06:28:54.975Z",
+        "updatedAt": "2026-08-31T06:28:54.975Z"
+      },
+      "donations": [],
+      "expectedDonations": [
+        {
+          "id": "legacy-expdonation-fromauction-1",
+          "yearProfileId": "legacy-year-2026-placeholder",
+          "date": "2026-08-31",
+          "categoryId": "legacy-cat-donation-Auction",
+          "donorName": "Chandra Shekar Goud Origanti",
+          "type": "monetary",
+          "amount": 42116,
+          "status": "pending",
+          "notes": "2025 Pedda Laddu",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expdonation-fromauction-2",
+          "yearProfileId": "legacy-year-2026-placeholder",
+          "date": "2026-08-31",
+          "categoryId": "legacy-cat-donation-Auction",
+          "donorName": "Nagabushanam Nellikanti",
+          "type": "monetary",
+          "amount": 30116,
+          "status": "pending",
+          "notes": "2025 Chinna Laddu",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expdonation-fromauction-3",
+          "yearProfileId": "legacy-year-2026-placeholder",
+          "date": "2026-08-31",
+          "categoryId": "legacy-cat-donation-Auction",
+          "donorName": "Venkateshwar Reddy K",
+          "type": "monetary",
+          "amount": 41116,
+          "status": "pending",
+          "notes": "2025 Kalasam",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expdonation-fromauction-4",
+          "yearProfileId": "legacy-year-2026-placeholder",
+          "date": "2026-08-31",
+          "categoryId": "legacy-cat-donation-Auction",
+          "donorName": "Lokesh Goud Veeramalla",
+          "type": "monetary",
+          "amount": 4216,
+          "status": "pending",
+          "notes": "2025 Hundi",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        },
+        {
+          "id": "legacy-expdonation-fromauction-5",
+          "yearProfileId": "legacy-year-2026-placeholder",
+          "date": "2026-08-31",
+          "categoryId": "legacy-cat-donation-Auction",
+          "donorName": "Krishna Sagar Dyapa",
+          "type": "monetary",
+          "amount": 21116,
+          "status": "pending",
+          "notes": "2025 Pattu Vasthralu",
+          "createdAt": "2026-08-31T06:28:54.975Z",
+          "updatedAt": "2026-08-31T06:28:54.975Z"
+        }
+      ],
+      "expenses": [],
+      "expectedExpenses": [],
+      "auctions": []
+    }
+  ],
+  "settings": {
+    "categories": [
+      {
+        "id": "legacy-cat-donation-Chanda",
+        "kind": "donation",
+        "name": "Chanda",
+        "active": true,
+        "order": 0,
+        "isDefault": false
+      },
+      {
+        "id": "legacy-cat-donation-Annadanam",
+        "kind": "donation",
+        "name": "Annadanam",
+        "active": true,
+        "order": 1,
+        "isDefault": false
+      },
+      {
+        "id": "legacy-cat-donation-Auction",
+        "kind": "donation",
+        "name": "Auction",
+        "active": true,
+        "order": 2,
+        "isDefault": false
+      },
+      {
+        "id": "legacy-cat-expense-Pooja Items",
+        "kind": "expense",
+        "name": "Pooja Items",
+        "active": true,
+        "order": 3,
+        "isDefault": false
+      },
+      {
+        "id": "legacy-cat-expense-Annadanam",
+        "kind": "expense",
+        "name": "Annadanam",
+        "active": true,
+        "order": 4,
+        "isDefault": false
+      },
+      {
+        "id": "legacy-cat-expense-Activities",
+        "kind": "expense",
+        "name": "Activities",
+        "active": true,
+        "order": 5,
+        "isDefault": false
+      },
+      {
+        "id": "legacy-cat-expense-Initial Setup",
+        "kind": "expense",
+        "name": "Initial Setup",
+        "active": true,
+        "order": 6,
+        "isDefault": false
+      },
+      {
+        "id": "legacy-cat-expense-Nimajjanam",
+        "kind": "expense",
+        "name": "Nimajjanam",
+        "active": true,
+        "order": 7,
+        "isDefault": false
+      }
+    ],
+    "units": [
+      {
+        "id": "legacy-unit-Kg",
+        "name": "Kg",
+        "active": true,
+        "order": 0,
+        "isDefault": false
+      }
+    ],
+    "appSettings": {
+      "displayName": "Ganesh Navarathri Manager",
+      "updatedAt": "2026-08-31T06:28:54.975Z"
+    }
+  }
+}
