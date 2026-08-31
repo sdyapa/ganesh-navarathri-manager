@@ -46,6 +46,8 @@ async function buildSettingsBlock() {
     appSettings: {
       displayName: appSettings.displayName,
       whatsappTemplates: appSettings.whatsappTemplates,
+      actionDisplayMode: appSettings.actionDisplayMode,
+      themePreference: appSettings.themePreference,
       updatedAt: appSettings.updatedAt,
     },
   }

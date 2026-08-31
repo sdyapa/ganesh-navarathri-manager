@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useProfiles } from '@/hooks/useYearData'
 import { useToast } from '@/context/ToastContext'
 import { deleteProfile, renameProfile, reorderProfiles, upsertProfileFromName } from '@/db/repositories/profiles'
+import { ActionButton } from '@/components/common/ActionButton'
+import { EDIT_ICON, DELETE_ICON } from '@/lib/actionIcons'
 import type { Profile, ProfileKind } from '@/types'
 
 interface ProfileListProps {
@@ -74,13 +76,9 @@ function ProfileList({ kind, title, description, placeholder }: ProfileListProps
                     Save
                   </button>
                 ) : (
-                  <button type="button" className="link-button" onClick={() => setEditing({ id: p.id, name: p.name })}>
-                    Rename
-                  </button>
+                  <ActionButton icon={EDIT_ICON} label="Rename" onClick={() => setEditing({ id: p.id, name: p.name })} />
                 )}
-                <button type="button" className="link-button link-button--danger" onClick={() => handleDelete(p)}>
-                  Delete
-                </button>
+                <ActionButton icon={DELETE_ICON} label="Delete" danger onClick={() => handleDelete(p)} />
               </div>
             </li>
           ))}

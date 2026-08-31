@@ -7,6 +7,8 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { insertPoojaAssignment, updatePoojaAssignment, deletePoojaAssignment } from '@/db/repositories/poojaAssignments'
 import { poojaAssignmentInputSchema } from '@/lib/validation'
 import { compareDateOnly, formatDisplayDate, todayDateOnly } from '@/lib/date'
+import { ActionButton } from '@/components/common/ActionButton'
+import { EDIT_ICON, DELETE_ICON } from '@/lib/actionIcons'
 import type { PoojaAssignment } from '@/types'
 
 interface DraftFields {
@@ -124,16 +126,12 @@ export function PoojaRosterSection() {
                   {a.notes && <span className="text-muted"> ({a.notes})</span>}
                 </span>
                 <div className="row-actions">
-                  <button
-                    type="button"
-                    className="link-button"
+                  <ActionButton
+                    icon={EDIT_ICON}
+                    label="Edit"
                     onClick={() => setEditing({ id: a.id, fields: { date: a.date, familyNames: a.familyNames, notes: a.notes ?? '' } })}
-                  >
-                    Edit
-                  </button>
-                  <button type="button" className="link-button link-button--danger" onClick={() => setDeleteTarget(a)}>
-                    Delete
-                  </button>
+                  />
+                  <ActionButton icon={DELETE_ICON} label="Delete" danger onClick={() => setDeleteTarget(a)} />
                 </div>
               </li>
             ),

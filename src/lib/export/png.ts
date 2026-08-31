@@ -79,6 +79,22 @@ export async function exportElementAsPng(element: HTMLElement, filename: string,
   const header = meta ? buildExportHeader(meta) : null
   if (header) element.insertBefore(header, element.firstChild)
 
+  // Force this subtree back to the light palette for the capture, regardless of the app's
+  // active theme — every stat card/badge/border color here is driven by the --color-* CSS
+  // variables (see global.css's "Dark theme" section), and exports must always render the same
+  // way no matter what theme is active on screen.
+  //
+  // `data-theme="light"` alone re-scopes what var(--color-*) resolves to for rules that apply
+  // WITHIN this subtree, but `color` is an *inherited* property — most text here (e.g.
+  // .stat-card__value) never sets its own `color` at all, so it just inherits body's already-
+  // computed value, which resolved dark if the app's theme is dark. Re-declaring the custom
+  // property here doesn't retroactively fix an already-inherited computed value, so `color`
+  // needs its own explicit override too, not just the data-theme attribute.
+  const previousTheme = element.getAttribute('data-theme')
+  const previousColor = element.style.color
+  element.setAttribute('data-theme', 'light')
+  element.style.color = '#1c1917'
+
   try {
     const canvas = await html2canvas(element, {
       backgroundColor: '#ffffff',
@@ -90,6 +106,9 @@ export async function exportElementAsPng(element: HTMLElement, filename: string,
     await canvasToPngDownload(canvas, filename)
   } finally {
     header?.remove()
+    if (previousTheme === null) element.removeAttribute('data-theme')
+    else element.setAttribute('data-theme', previousTheme)
+    element.style.color = previousColor
   }
 }
 
@@ -141,8 +160,18 @@ export async function exportTableReportAsPng(filename: string, options: PngTable
   const { default: html2canvas } = await import('html2canvas')
 
   const container = document.createElement('div')
+  // `color: #1c1917` is set explicitly, not just `data-theme="light"` — table cells (.data-table
+  // td) never declare their own `color`, they just inherit body's already-computed value, which
+  // resolves dark if the app's theme is dark. data-theme alone only re-scopes fresh var(...)
+  // lookups within this subtree; it can't retroactively fix an already-inherited computed color,
+  // so it needs an explicit override here too (see exportElementAsPng's identical fix/comment).
   container.style.cssText =
-    'position: fixed; left: -10000px; top: 0; width: 960px; background: #ffffff; padding: 8px; font-family: inherit;'
+    'position: fixed; left: -10000px; top: 0; width: 960px; background: #ffffff; color: #1c1917; padding: 8px; font-family: inherit;'
+  // Despite being off-screen/fixed-position, this still inherits the app's --color-* CSS
+  // variables from <html> through normal DOM inheritance — force it back to light regardless of
+  // the active theme (see global.css's "Dark theme" section) so the .data-table styling below
+  // always renders the same way.
+  container.setAttribute('data-theme', 'light')
   container.appendChild(buildExportHeader(options))
 
   for (const { heading, table } of options.tables) {

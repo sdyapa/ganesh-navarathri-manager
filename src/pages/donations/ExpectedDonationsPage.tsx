@@ -13,6 +13,7 @@ import { Pagination } from '@/components/common/Pagination'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { SummaryList } from '@/components/common/SummaryList'
 import { FieldDiffList } from '@/components/common/FieldDiffList'
+import { ActionButton } from '@/components/common/ActionButton'
 import { DonationForm, defaultDonationFormValues, donationToFormValues } from './DonationForm'
 import {
   insertExpectedDonation,
@@ -24,6 +25,7 @@ import { formatCurrency, formatNumber } from '@/lib/currency'
 import { formatDisplayDate, todayDateOnly } from '@/lib/date'
 import { matchesSearch, sortByKey, type SortDirection } from '@/lib/tableUtils'
 import { diffFields } from '@/lib/diff'
+import { EDIT_ICON, DELETE_ICON, DUPLICATE_ICON, MOVE_ICON } from '@/lib/actionIcons'
 import type { DonationInput } from '@/lib/validation'
 import type { ExpectedDonation } from '@/types'
 
@@ -31,6 +33,7 @@ type ModalState =
   | { mode: 'closed' }
   | { mode: 'add' }
   | { mode: 'edit'; record: ExpectedDonation }
+  | { mode: 'duplicate'; record: ExpectedDonation }
   | { mode: 'convert'; record: ExpectedDonation }
 
 const SORT_OPTIONS = [
@@ -131,6 +134,12 @@ export function ExpectedDonationsPage() {
     }
   }
 
+  async function handleDuplicate(input: DonationInput) {
+    await insertExpectedDonation(currentYearId!, input)
+    setModal({ mode: 'closed' })
+    showToast('Expected donation duplicated')
+  }
+
   async function confirmDelete() {
     if (!deleteTarget) return
     setBusy(true)
@@ -161,15 +170,10 @@ export function ExpectedDonationsPage() {
       render: (d) =>
         d.status === 'pending' ? (
           <div className="row-actions">
-            <button type="button" className="link-button" onClick={() => setModal({ mode: 'convert', record: d })}>
-              Convert to Donation
-            </button>
-            <button type="button" className="link-button" onClick={() => setModal({ mode: 'edit', record: d })}>
-              Edit
-            </button>
-            <button type="button" className="link-button link-button--danger" onClick={() => setDeleteTarget(d)}>
-              Delete
-            </button>
+            <ActionButton icon={MOVE_ICON} label="Convert to Donation" onClick={() => setModal({ mode: 'convert', record: d })} />
+            <ActionButton icon={EDIT_ICON} label="Edit" onClick={() => setModal({ mode: 'edit', record: d })} />
+            <ActionButton icon={DUPLICATE_ICON} label="Duplicate" onClick={() => setModal({ mode: 'duplicate', record: d })} />
+            <ActionButton icon={DELETE_ICON} label="Delete" danger onClick={() => setDeleteTarget(d)} />
           </div>
         ) : (
           <span className="text-muted">Already converted</span>
@@ -241,15 +245,10 @@ export function ExpectedDonationsPage() {
                     </div>
                     {d.status === 'pending' && (
                       <div className="row-actions">
-                        <button type="button" className="link-button" onClick={() => setModal({ mode: 'convert', record: d })}>
-                          Convert to Donation
-                        </button>
-                        <button type="button" className="link-button" onClick={() => setModal({ mode: 'edit', record: d })}>
-                          Edit
-                        </button>
-                        <button type="button" className="link-button link-button--danger" onClick={() => setDeleteTarget(d)}>
-                          Delete
-                        </button>
+                        <ActionButton icon={MOVE_ICON} label="Convert to Donation" onClick={() => setModal({ mode: 'convert', record: d })} />
+                        <ActionButton icon={EDIT_ICON} label="Edit" onClick={() => setModal({ mode: 'edit', record: d })} />
+                        <ActionButton icon={DUPLICATE_ICON} label="Duplicate" onClick={() => setModal({ mode: 'duplicate', record: d })} />
+                        <ActionButton icon={DELETE_ICON} label="Delete" danger onClick={() => setDeleteTarget(d)} />
                       </div>
                     )}
                   </>
@@ -285,6 +284,18 @@ export function ExpectedDonationsPage() {
           categories={categories}
           units={units}
           onSubmit={(input) => handleEditSubmit(modal.record, input)}
+          onClose={() => setModal({ mode: 'closed' })}
+        />
+      )}
+
+      {modal.mode === 'duplicate' && (
+        <DonationForm
+          title="Duplicate Expected Donation"
+          submitLabel="Save Duplicate"
+          initialValues={donationToFormValues(modal.record, todayDateOnly())}
+          categories={categories}
+          units={units}
+          onSubmit={handleDuplicate}
           onClose={() => setModal({ mode: 'closed' })}
         />
       )}

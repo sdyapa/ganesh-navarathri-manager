@@ -12,6 +12,7 @@ import { Pagination } from '@/components/common/Pagination'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { SummaryList } from '@/components/common/SummaryList'
 import { FieldDiffList } from '@/components/common/FieldDiffList'
+import { ActionButton } from '@/components/common/ActionButton'
 import { ExpenseForm, defaultExpenseFormValues, expenseToFormValues } from './ExpenseForm'
 import {
   insertExpectedExpense,
@@ -23,6 +24,7 @@ import { formatCurrency } from '@/lib/currency'
 import { formatDisplayDate, todayDateOnly } from '@/lib/date'
 import { matchesSearch, sortByKey, type SortDirection } from '@/lib/tableUtils'
 import { diffFields } from '@/lib/diff'
+import { EDIT_ICON, DELETE_ICON, DUPLICATE_ICON, MOVE_ICON } from '@/lib/actionIcons'
 import type { ExpenseInput } from '@/lib/validation'
 import type { ExpectedExpense } from '@/types'
 
@@ -30,6 +32,7 @@ type ModalState =
   | { mode: 'closed' }
   | { mode: 'add' }
   | { mode: 'edit'; record: ExpectedExpense }
+  | { mode: 'duplicate'; record: ExpectedExpense }
   | { mode: 'move'; record: ExpectedExpense }
 
 const SORT_OPTIONS = [
@@ -122,6 +125,12 @@ export function ExpectedExpensesPage() {
     }
   }
 
+  async function handleDuplicate(input: ExpenseInput) {
+    await insertExpectedExpense(currentYearId!, input)
+    setModal({ mode: 'closed' })
+    showToast('Expected expense duplicated')
+  }
+
   async function confirmDelete() {
     if (!deleteTarget) return
     setBusy(true)
@@ -146,15 +155,10 @@ export function ExpectedExpensesPage() {
       render: (e) =>
         e.status === 'pending' ? (
           <div className="row-actions">
-            <button type="button" className="link-button" onClick={() => setModal({ mode: 'move', record: e })}>
-              Move to Expenses
-            </button>
-            <button type="button" className="link-button" onClick={() => setModal({ mode: 'edit', record: e })}>
-              Edit
-            </button>
-            <button type="button" className="link-button link-button--danger" onClick={() => setDeleteTarget(e)}>
-              Delete
-            </button>
+            <ActionButton icon={MOVE_ICON} label="Move to Expenses" onClick={() => setModal({ mode: 'move', record: e })} />
+            <ActionButton icon={EDIT_ICON} label="Edit" onClick={() => setModal({ mode: 'edit', record: e })} />
+            <ActionButton icon={DUPLICATE_ICON} label="Duplicate" onClick={() => setModal({ mode: 'duplicate', record: e })} />
+            <ActionButton icon={DELETE_ICON} label="Delete" danger onClick={() => setDeleteTarget(e)} />
           </div>
         ) : (
           <span className="text-muted">Already moved</span>
@@ -224,15 +228,10 @@ export function ExpectedExpensesPage() {
                     </div>
                     {e.status === 'pending' && (
                       <div className="row-actions">
-                        <button type="button" className="link-button" onClick={() => setModal({ mode: 'move', record: e })}>
-                          Move to Expenses
-                        </button>
-                        <button type="button" className="link-button" onClick={() => setModal({ mode: 'edit', record: e })}>
-                          Edit
-                        </button>
-                        <button type="button" className="link-button link-button--danger" onClick={() => setDeleteTarget(e)}>
-                          Delete
-                        </button>
+                        <ActionButton icon={MOVE_ICON} label="Move to Expenses" onClick={() => setModal({ mode: 'move', record: e })} />
+                        <ActionButton icon={EDIT_ICON} label="Edit" onClick={() => setModal({ mode: 'edit', record: e })} />
+                        <ActionButton icon={DUPLICATE_ICON} label="Duplicate" onClick={() => setModal({ mode: 'duplicate', record: e })} />
+                        <ActionButton icon={DELETE_ICON} label="Delete" danger onClick={() => setDeleteTarget(e)} />
                       </div>
                     )}
                   </>
@@ -266,6 +265,17 @@ export function ExpectedExpensesPage() {
           initialValues={expenseToFormValues(modal.record)}
           categories={categories}
           onSubmit={(input) => handleEditSubmit(modal.record, input)}
+          onClose={() => setModal({ mode: 'closed' })}
+        />
+      )}
+
+      {modal.mode === 'duplicate' && (
+        <ExpenseForm
+          title="Duplicate Expected Expense"
+          submitLabel="Save Duplicate"
+          initialValues={expenseToFormValues(modal.record, todayDateOnly())}
+          categories={categories}
+          onSubmit={handleDuplicate}
           onClose={() => setModal({ mode: 'closed' })}
         />
       )}

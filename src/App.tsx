@@ -3,6 +3,7 @@ import { HashRouter, Routes, Route } from 'react-router-dom'
 import { YearProvider } from '@/context/YearContext'
 import { ToastProvider } from '@/context/ToastContext'
 import { AppLayout } from '@/components/layout/AppLayout'
+import { ThemeApplier } from '@/components/layout/ThemeApplier'
 import { Dashboard } from '@/pages/Dashboard'
 import { DonationsPage } from '@/pages/donations/DonationsPage'
 import { ExpectedDonationsPage } from '@/pages/donations/ExpectedDonationsPage'
@@ -25,6 +26,7 @@ const ReportsPage = lazy(() => import('@/pages/reports/ReportsPage').then((m) =>
 export function App() {
   return (
     <ToastProvider>
+      <ThemeApplier />
       <YearProvider>
         <HashRouter>
           <Routes>

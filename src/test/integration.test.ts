@@ -40,8 +40,10 @@ import { applyBackupImport, inspectBackupFile } from '@/services/backupImport'
 import {
   getAppSettings,
   recordDriveBackupCompleted,
+  updateActionDisplayMode,
   updateDisplayName,
   updateDriveReminderIntervalDays,
+  updateThemePreference,
 } from '@/db/repositories/settings'
 import { DEFAULT_DISPLAY_NAME } from '@/db/defaults'
 import { seedSampleData, YearHasRealDataError } from '@/services/sampleDataService'
@@ -885,6 +887,62 @@ describe('customizable display name', () => {
     await applyBackupImport(inspection.backup, 'replace-all')
 
     expect((await getAppSettings()).displayName).toBe('Kept Across Old Restore')
+  })
+})
+
+describe('appearance settings (action display mode + theme)', () => {
+  it('defaults to text-only actions and the system theme', async () => {
+    const settings = await getAppSettings()
+    expect(settings.actionDisplayMode).toBe('text')
+    expect(settings.themePreference).toBe('system')
+  })
+
+  it('updates independently of other settings', async () => {
+    await updateDriveReminderIntervalDays(5)
+    await updateActionDisplayMode('icon')
+    await updateThemePreference('dark')
+
+    const settings = await getAppSettings()
+    expect(settings.actionDisplayMode).toBe('icon')
+    expect(settings.themePreference).toBe('dark')
+    expect(settings.driveBackupReminder.intervalDays).toBe(5) // unaffected by either change
+  })
+
+  it('is included in an exported backup and restored by a full "replace-all" import', async () => {
+    await updateActionDisplayMode('both')
+    await updateThemePreference('light')
+    const backup = await exportFullBackup()
+    expect(backup.settings.appSettings.actionDisplayMode).toBe('both')
+    expect(backup.settings.appSettings.themePreference).toBe('light')
+
+    await updateActionDisplayMode('text') // simulate a different device's current settings
+    await updateThemePreference('system')
+    const inspection = await inspectBackupFile(backup)
+    if (!inspection.valid) throw new Error('expected valid backup')
+    await applyBackupImport(inspection.backup, 'replace-all')
+
+    const restored = await getAppSettings()
+    expect(restored.actionDisplayMode).toBe('both')
+    expect(restored.themePreference).toBe('light')
+  })
+
+  it('falls back to the current device values when restoring an older backup that predates these fields', async () => {
+    await updateActionDisplayMode('icon')
+    await updateThemePreference('dark')
+    const backup = await exportFullBackup()
+    // Simulate a pre-existing backup captured before these fields were introduced.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    delete (backup.settings.appSettings as any).actionDisplayMode
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    delete (backup.settings.appSettings as any).themePreference
+
+    const inspection = await inspectBackupFile(backup)
+    if (!inspection.valid) throw new Error('expected valid backup')
+    await applyBackupImport(inspection.backup, 'replace-all')
+
+    const restored = await getAppSettings()
+    expect(restored.actionDisplayMode).toBe('icon')
+    expect(restored.themePreference).toBe('dark')
   })
 })
 

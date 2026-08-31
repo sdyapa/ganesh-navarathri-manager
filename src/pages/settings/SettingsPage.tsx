@@ -1,5 +1,6 @@
 import { useSearchParams } from 'react-router-dom'
 import { GeneralSettings } from './GeneralSettings'
+import { AppearanceSettings } from './AppearanceSettings'
 import { YearSettings } from './YearSettings'
 import { CategorySettings } from './CategorySettings'
 import { UnitSettings } from './UnitSettings'
@@ -10,6 +11,7 @@ import { GoogleDriveSettings } from './GoogleDriveSettings'
 
 const SECTIONS = [
   { key: 'general', label: 'General' },
+  { key: 'appearance', label: 'Appearance' },
   { key: 'years', label: 'Years & Profiles' },
   { key: 'categories', label: 'Categories' },
   { key: 'units', label: 'Units' },
@@ -52,6 +54,7 @@ export function SettingsPage() {
 
       <div className="settings-panel">
         {section === 'general' && <GeneralSettings />}
+        {section === 'appearance' && <AppearanceSettings />}
         {section === 'years' && <YearSettings />}
         {section === 'categories' && <CategorySettings />}
         {section === 'units' && <UnitSettings />}

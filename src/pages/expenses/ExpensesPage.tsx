@@ -14,23 +14,30 @@ import { FieldDiffList } from '@/components/common/FieldDiffList'
 import { SummaryList } from '@/components/common/SummaryList'
 import { ExportButtons } from '@/components/common/ExportButtons'
 import { CopyToYearModal, NEXT_YEAR_VALUE } from '@/components/common/CopyToYearModal'
+import { ActionButton } from '@/components/common/ActionButton'
 import { ExpenseForm, defaultExpenseFormValues, expenseToFormValues } from './ExpenseForm'
 import { insertExpense, updateExpense, deleteExpense } from '@/db/repositories/expenses'
 import { copyExpensesToExpected } from '@/services/copyForwardService'
 import { revertExpenseToExpected } from '@/services/conversionService'
 import { getOrCreateNextYearProfile } from '@/services/yearService'
 import { formatCurrency, formatCurrencyForPdf } from '@/lib/currency'
-import { formatDisplayDate, isDateInRange } from '@/lib/date'
+import { formatDisplayDate, isDateInRange, todayDateOnly } from '@/lib/date'
 import { matchesSearch, sortByKey, type SortDirection } from '@/lib/tableUtils'
 import { diffFields } from '@/lib/diff'
 import { buildPdfReport, pdfFileName } from '@/lib/export/pdf'
 import { buildExpensesTable } from '@/lib/export/reportBuilders'
 import { exportTableReportAsPng, pngFileName } from '@/lib/export/png'
 import { getAppSettings } from '@/db/repositories/settings'
+import { EDIT_ICON, DELETE_ICON, DUPLICATE_ICON, REVERT_ICON } from '@/lib/actionIcons'
 import type { ExpenseInput } from '@/lib/validation'
 import type { Expense } from '@/types'
 
-type ModalState = { mode: 'closed' } | { mode: 'add' } | { mode: 'edit'; expense: Expense } | { mode: 'copy' }
+type ModalState =
+  | { mode: 'closed' }
+  | { mode: 'add' }
+  | { mode: 'edit'; expense: Expense }
+  | { mode: 'duplicate'; expense: Expense }
+  | { mode: 'copy' }
 
 const SORT_OPTIONS = [
   { value: 'date-desc', label: 'Date (Newest first)' },
@@ -158,6 +165,12 @@ export function ExpensesPage() {
     }
   }
 
+  async function handleDuplicate(input: ExpenseInput) {
+    await insertExpense(currentYearId!, input)
+    setModal({ mode: 'closed' })
+    showToast('Expense duplicated successfully')
+  }
+
   async function confirmRevert() {
     if (!revertTarget) return
     setBusy(true)
@@ -254,16 +267,11 @@ export function ExpensesPage() {
       header: 'Actions',
       render: (e) => (
         <div className="row-actions">
-          <button type="button" className="link-button" onClick={() => setModal({ mode: 'edit', expense: e })}>
-            Edit
-          </button>
-          <button type="button" className="link-button link-button--danger" onClick={() => setDeleteTarget(e)}>
-            Delete
-          </button>
+          <ActionButton icon={EDIT_ICON} label="Edit" onClick={() => setModal({ mode: 'edit', expense: e })} />
+          <ActionButton icon={DUPLICATE_ICON} label="Duplicate" onClick={() => setModal({ mode: 'duplicate', expense: e })} />
+          <ActionButton icon={DELETE_ICON} label="Delete" danger onClick={() => setDeleteTarget(e)} />
           {e.sourceExpectedExpenseId && (
-            <button type="button" className="link-button" onClick={() => setRevertTarget(e)}>
-              Move back to Expected
-            </button>
+            <ActionButton icon={REVERT_ICON} label="Move back to Expected" onClick={() => setRevertTarget(e)} />
           )}
         </div>
       ),
@@ -380,16 +388,11 @@ export function ExpensesPage() {
                     </div>
                     {e.notes && <div className="record-card__notes">{e.notes}</div>}
                     <div className="row-actions">
-                      <button type="button" className="link-button" onClick={() => setModal({ mode: 'edit', expense: e })}>
-                        Edit
-                      </button>
-                      <button type="button" className="link-button link-button--danger" onClick={() => setDeleteTarget(e)}>
-                        Delete
-                      </button>
+                      <ActionButton icon={EDIT_ICON} label="Edit" onClick={() => setModal({ mode: 'edit', expense: e })} />
+                      <ActionButton icon={DUPLICATE_ICON} label="Duplicate" onClick={() => setModal({ mode: 'duplicate', expense: e })} />
+                      <ActionButton icon={DELETE_ICON} label="Delete" danger onClick={() => setDeleteTarget(e)} />
                       {e.sourceExpectedExpenseId && (
-                        <button type="button" className="link-button" onClick={() => setRevertTarget(e)}>
-                          Move back to Expected
-                        </button>
+                        <ActionButton icon={REVERT_ICON} label="Move back to Expected" onClick={() => setRevertTarget(e)} />
                       )}
                     </div>
                   </>
@@ -425,6 +428,18 @@ export function ExpensesPage() {
           categories={categories}
           paymentGroupOptions={paymentGroupOptions}
           onSubmit={(input) => handleEditSubmit(modal.expense, input)}
+          onClose={() => setModal({ mode: 'closed' })}
+        />
+      )}
+
+      {modal.mode === 'duplicate' && (
+        <ExpenseForm
+          title="Duplicate Expense"
+          submitLabel="Save Duplicate"
+          initialValues={expenseToFormValues(modal.expense, todayDateOnly())}
+          categories={categories}
+          paymentGroupOptions={paymentGroupOptions}
+          onSubmit={handleDuplicate}
           onClose={() => setModal({ mode: 'closed' })}
         />
       )}

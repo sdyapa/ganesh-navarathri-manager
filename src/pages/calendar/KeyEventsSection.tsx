@@ -7,6 +7,8 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { insertKeyEvent, updateKeyEvent, deleteKeyEvent } from '@/db/repositories/keyEvents'
 import { keyEventInputSchema } from '@/lib/validation'
 import { compareDateOnly, formatDisplayDate, todayDateOnly } from '@/lib/date'
+import { ActionButton } from '@/components/common/ActionButton'
+import { EDIT_ICON, DELETE_ICON } from '@/lib/actionIcons'
 import type { KeyEvent } from '@/types'
 
 interface DraftFields {
@@ -119,16 +121,12 @@ export function KeyEventsSection() {
                   {ev.notes && <span className="text-muted"> ({ev.notes})</span>}
                 </span>
                 <div className="row-actions">
-                  <button
-                    type="button"
-                    className="link-button"
+                  <ActionButton
+                    icon={EDIT_ICON}
+                    label="Edit"
                     onClick={() => setEditing({ id: ev.id, fields: { name: ev.name, date: ev.date, notes: ev.notes ?? '' } })}
-                  >
-                    Edit
-                  </button>
-                  <button type="button" className="link-button link-button--danger" onClick={() => setDeleteTarget(ev)}>
-                    Delete
-                  </button>
+                  />
+                  <ActionButton icon={DELETE_ICON} label="Delete" danger onClick={() => setDeleteTarget(ev)} />
                 </div>
               </li>
             ),

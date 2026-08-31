@@ -15,23 +15,30 @@ import { FieldDiffList } from '@/components/common/FieldDiffList'
 import { SummaryList } from '@/components/common/SummaryList'
 import { ExportButtons } from '@/components/common/ExportButtons'
 import { CopyToYearModal, NEXT_YEAR_VALUE } from '@/components/common/CopyToYearModal'
+import { ActionButton } from '@/components/common/ActionButton'
 import { DonationForm, defaultDonationFormValues, donationToFormValues } from './DonationForm'
 import { insertDonation, updateDonation, deleteDonation } from '@/db/repositories/donations'
 import { copyDonationsToExpected } from '@/services/copyForwardService'
 import { revertDonationToExpected } from '@/services/conversionService'
 import { getOrCreateNextYearProfile } from '@/services/yearService'
 import { formatCurrency, formatCurrencyForPdf, formatNumber } from '@/lib/currency'
-import { formatDisplayDate, isDateInRange } from '@/lib/date'
+import { formatDisplayDate, isDateInRange, todayDateOnly } from '@/lib/date'
 import { matchesSearch, sortByKey, type SortDirection } from '@/lib/tableUtils'
 import { diffFields } from '@/lib/diff'
 import { buildPdfReport, pdfFileName } from '@/lib/export/pdf'
 import { buildMonetaryDonationsTable, buildCommodityDonationsTable } from '@/lib/export/reportBuilders'
 import { exportTableReportAsPng, pngFileName } from '@/lib/export/png'
 import { getAppSettings } from '@/db/repositories/settings'
+import { EDIT_ICON, DELETE_ICON, DUPLICATE_ICON, COPY_ICON, REVERT_ICON } from '@/lib/actionIcons'
 import type { DonationInput } from '@/lib/validation'
 import type { Donation } from '@/types'
 
-type ModalState = { mode: 'closed' } | { mode: 'add' } | { mode: 'edit'; donation: Donation } | { mode: 'copy' }
+type ModalState =
+  | { mode: 'closed' }
+  | { mode: 'add' }
+  | { mode: 'edit'; donation: Donation }
+  | { mode: 'duplicate'; donation: Donation }
+  | { mode: 'copy' }
 
 const SORT_OPTIONS = [
   { value: 'date-desc', label: 'Date (Newest first)' },
@@ -141,6 +148,12 @@ export function DonationsPage() {
     } finally {
       setBusy(false)
     }
+  }
+
+  async function handleDuplicate(input: DonationInput) {
+    await insertDonation(currentYearId!, input)
+    setModal({ mode: 'closed' })
+    showToast('Donation duplicated successfully')
   }
 
   async function confirmRevert() {
@@ -268,19 +281,12 @@ export function DonationsPage() {
       header: 'Actions',
       render: (d) => (
         <div className="row-actions">
-          <button type="button" className="link-button" onClick={() => setModal({ mode: 'edit', donation: d })}>
-            Edit
-          </button>
-          <button type="button" className="link-button link-button--danger" onClick={() => setDeleteTarget(d)}>
-            Delete
-          </button>
-          <button type="button" className="link-button" onClick={() => shareDonation(d)}>
-            Copy WhatsApp
-          </button>
+          <ActionButton icon={EDIT_ICON} label="Edit" onClick={() => setModal({ mode: 'edit', donation: d })} />
+          <ActionButton icon={DUPLICATE_ICON} label="Duplicate" onClick={() => setModal({ mode: 'duplicate', donation: d })} />
+          <ActionButton icon={DELETE_ICON} label="Delete" danger onClick={() => setDeleteTarget(d)} />
+          <ActionButton icon={COPY_ICON} label="Copy WhatsApp" onClick={() => shareDonation(d)} />
           {d.sourceExpectedDonationId && (
-            <button type="button" className="link-button" onClick={() => setRevertTarget(d)}>
-              Move back to Expected
-            </button>
+            <ActionButton icon={REVERT_ICON} label="Move back to Expected" onClick={() => setRevertTarget(d)} />
           )}
         </div>
       ),
@@ -368,19 +374,12 @@ export function DonationsPage() {
                     </div>
                     {d.notes && <div className="record-card__notes">{d.notes}</div>}
                     <div className="row-actions">
-                      <button type="button" className="link-button" onClick={() => setModal({ mode: 'edit', donation: d })}>
-                        Edit
-                      </button>
-                      <button type="button" className="link-button link-button--danger" onClick={() => setDeleteTarget(d)}>
-                        Delete
-                      </button>
-                      <button type="button" className="link-button" onClick={() => shareDonation(d)}>
-                        Copy WhatsApp
-                      </button>
+                      <ActionButton icon={EDIT_ICON} label="Edit" onClick={() => setModal({ mode: 'edit', donation: d })} />
+                      <ActionButton icon={DUPLICATE_ICON} label="Duplicate" onClick={() => setModal({ mode: 'duplicate', donation: d })} />
+                      <ActionButton icon={DELETE_ICON} label="Delete" danger onClick={() => setDeleteTarget(d)} />
+                      <ActionButton icon={COPY_ICON} label="Copy WhatsApp" onClick={() => shareDonation(d)} />
                       {d.sourceExpectedDonationId && (
-                        <button type="button" className="link-button" onClick={() => setRevertTarget(d)}>
-                          Move back to Expected
-                        </button>
+                        <ActionButton icon={REVERT_ICON} label="Move back to Expected" onClick={() => setRevertTarget(d)} />
                       )}
                     </div>
                   </>
@@ -416,6 +415,18 @@ export function DonationsPage() {
           categories={categories}
           units={units}
           onSubmit={(input) => handleEditSubmit(modal.donation, input)}
+          onClose={() => setModal({ mode: 'closed' })}
+        />
+      )}
+
+      {modal.mode === 'duplicate' && (
+        <DonationForm
+          title="Duplicate Donation"
+          submitLabel="Save Duplicate"
+          initialValues={donationToFormValues(modal.donation, todayDateOnly())}
+          categories={categories}
+          units={units}
+          onSubmit={handleDuplicate}
           onClose={() => setModal({ mode: 'closed' })}
         />
       )}

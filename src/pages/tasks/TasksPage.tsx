@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/common/EmptyState'
 import { FilterBar, SelectFilter, SortControl } from '@/components/common/Filters'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { SummaryList } from '@/components/common/SummaryList'
+import { ActionButton } from '@/components/common/ActionButton'
 import { TaskForm, defaultTaskFormValues, taskToFormValues } from './TaskForm'
 import {
   insertTask,
@@ -19,6 +20,7 @@ import {
 } from '@/db/repositories/tasks'
 import { formatDisplayDate } from '@/lib/date'
 import { sortByKey, type SortDirection } from '@/lib/tableUtils'
+import { EDIT_ICON, DELETE_ICON, DONE_ICON, UNDO_DONE_ICON } from '@/lib/actionIcons'
 import type { TaskInput } from '@/lib/validation'
 import type { Task } from '@/types'
 
@@ -149,9 +151,7 @@ export function TasksPage() {
                             <input type="checkbox" checked={item.done} onChange={() => toggleChecklistItem(t.id, item.id)} />
                             <span className={item.done ? 'checklist-item--done' : undefined}>{item.label}</span>
                           </label>
-                          <button type="button" className="link-button link-button--danger" onClick={() => removeChecklistItem(t.id, item.id)}>
-                            Remove
-                          </button>
+                          <ActionButton icon={DELETE_ICON} label="Remove" danger onClick={() => removeChecklistItem(t.id, item.id)} />
                         </li>
                       ))}
                     </ul>
@@ -170,15 +170,13 @@ export function TasksPage() {
                   </div>
 
                   <div className="row-actions">
-                    <button type="button" className="link-button" onClick={() => setTaskDone(t.id, !t.done)}>
-                      {t.done ? 'Mark Pending' : 'Mark Done'}
-                    </button>
-                    <button type="button" className="link-button" onClick={() => setModal({ mode: 'edit', task: t })}>
-                      Edit
-                    </button>
-                    <button type="button" className="link-button link-button--danger" onClick={() => setDeleteTarget(t)}>
-                      Delete
-                    </button>
+                    <ActionButton
+                      icon={t.done ? UNDO_DONE_ICON : DONE_ICON}
+                      label={t.done ? 'Mark Pending' : 'Mark Done'}
+                      onClick={() => setTaskDone(t.id, !t.done)}
+                    />
+                    <ActionButton icon={EDIT_ICON} label="Edit" onClick={() => setModal({ mode: 'edit', task: t })} />
+                    <ActionButton icon={DELETE_ICON} label="Delete" danger onClick={() => setDeleteTarget(t)} />
                   </div>
                 </div>
               ))}

@@ -1,9 +1,11 @@
-import type { Category, DriveBackupReminderSettings, Unit } from '@/types'
+import type { ActionDisplayMode, Category, DriveBackupReminderSettings, ThemePreference, Unit } from '@/types'
 import { generateId } from '@/lib/id'
 import { DEFAULT_COMMODITY_TEMPLATE, DEFAULT_MONETARY_TEMPLATE } from '@/lib/whatsapp'
 
 export const DEFAULT_DRIVE_REMINDER_INTERVAL_DAYS = 1
 export const DEFAULT_DISPLAY_NAME = 'Ganesh Navarathri Manager'
+export const DEFAULT_ACTION_DISPLAY_MODE: ActionDisplayMode = 'text'
+export const DEFAULT_THEME_PREFERENCE: ThemePreference = 'system'
 
 export const DEFAULT_DONATION_CATEGORY_NAMES = ['Chanda', 'Annadanam', 'Auction']
 export const DEFAULT_EXPENSE_CATEGORY_NAMES = [

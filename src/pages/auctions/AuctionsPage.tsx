@@ -13,6 +13,7 @@ import { FieldDiffList } from '@/components/common/FieldDiffList'
 import { SummaryList } from '@/components/common/SummaryList'
 import { StatCard } from '@/components/common/StatCard'
 import { ExportButtons } from '@/components/common/ExportButtons'
+import { ActionButton } from '@/components/common/ActionButton'
 import { AuctionForm, defaultAuctionFormValues, auctionToFormValues } from './AuctionForm'
 import { DonationForm, type DonationFormValues } from '@/pages/donations/DonationForm'
 import { insertAuction, updateAuction, deleteAuction } from '@/db/repositories/auctions'
@@ -26,6 +27,7 @@ import { buildPdfReport, pdfFileName } from '@/lib/export/pdf'
 import { buildAuctionsTable } from '@/lib/export/reportBuilders'
 import { exportTableReportAsPng, pngFileName } from '@/lib/export/png'
 import { getAppSettings } from '@/db/repositories/settings'
+import { EDIT_ICON, DELETE_ICON, DUPLICATE_ICON, MOVE_ICON } from '@/lib/actionIcons'
 import type { AuctionInput, DonationInput } from '@/lib/validation'
 import type { Auction, Category, YearProfile } from '@/types'
 
@@ -33,6 +35,7 @@ type ModalState =
   | { mode: 'closed' }
   | { mode: 'add' }
   | { mode: 'edit'; auction: Auction }
+  | { mode: 'duplicate'; auction: Auction }
   | { mode: 'convert'; auction: Auction }
 
 const SORT_OPTIONS = [
@@ -162,6 +165,12 @@ export function AuctionsPage() {
     }
   }
 
+  async function handleDuplicate(input: AuctionInput) {
+    await insertAuction(currentYearId!, input)
+    setModal({ mode: 'closed' })
+    showToast('Auction entry duplicated successfully')
+  }
+
   async function handleConvertAuction(auction: Auction, input: DonationInput) {
     setBusy(true)
     try {
@@ -221,16 +230,11 @@ export function AuctionsPage() {
           {a.convertedToExpectedDonationId ? (
             <span className="text-muted">✓ Pledge created</span>
           ) : (
-            <button type="button" className="link-button" onClick={() => setModal({ mode: 'convert', auction: a })}>
-              Convert to Expected Donation
-            </button>
+            <ActionButton icon={MOVE_ICON} label="Convert to Expected Donation" onClick={() => setModal({ mode: 'convert', auction: a })} />
           )}
-          <button type="button" className="link-button" onClick={() => setModal({ mode: 'edit', auction: a })}>
-            Edit
-          </button>
-          <button type="button" className="link-button link-button--danger" onClick={() => setDeleteTarget(a)}>
-            Delete
-          </button>
+          <ActionButton icon={EDIT_ICON} label="Edit" onClick={() => setModal({ mode: 'edit', auction: a })} />
+          <ActionButton icon={DUPLICATE_ICON} label="Duplicate" onClick={() => setModal({ mode: 'duplicate', auction: a })} />
+          <ActionButton icon={DELETE_ICON} label="Delete" danger onClick={() => setDeleteTarget(a)} />
         </div>
       ),
     },
@@ -296,16 +300,11 @@ export function AuctionsPage() {
                       {a.convertedToExpectedDonationId ? (
                         <span className="text-muted">✓ Pledge created</span>
                       ) : (
-                        <button type="button" className="link-button" onClick={() => setModal({ mode: 'convert', auction: a })}>
-                          Convert to Expected Donation
-                        </button>
+                        <ActionButton icon={MOVE_ICON} label="Convert to Expected Donation" onClick={() => setModal({ mode: 'convert', auction: a })} />
                       )}
-                      <button type="button" className="link-button" onClick={() => setModal({ mode: 'edit', auction: a })}>
-                        Edit
-                      </button>
-                      <button type="button" className="link-button link-button--danger" onClick={() => setDeleteTarget(a)}>
-                        Delete
-                      </button>
+                      <ActionButton icon={EDIT_ICON} label="Edit" onClick={() => setModal({ mode: 'edit', auction: a })} />
+                      <ActionButton icon={DUPLICATE_ICON} label="Duplicate" onClick={() => setModal({ mode: 'duplicate', auction: a })} />
+                      <ActionButton icon={DELETE_ICON} label="Delete" danger onClick={() => setDeleteTarget(a)} />
                     </div>
                   </>
                 )}
@@ -336,6 +335,16 @@ export function AuctionsPage() {
           submitLabel="Review Changes"
           initialValues={auctionToFormValues(modal.auction)}
           onSubmit={(input) => handleEditSubmit(modal.auction, input)}
+          onClose={() => setModal({ mode: 'closed' })}
+        />
+      )}
+
+      {modal.mode === 'duplicate' && (
+        <AuctionForm
+          title="Duplicate Auction Entry"
+          submitLabel="Save Duplicate"
+          initialValues={auctionToFormValues(modal.auction, todayDateOnly())}
+          onSubmit={handleDuplicate}
           onClose={() => setModal({ mode: 'closed' })}
         />
       )}

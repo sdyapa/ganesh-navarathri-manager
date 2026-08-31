@@ -1,7 +1,13 @@
 import { db } from '@/db/db'
 import { nowIso } from '@/lib/date'
-import { DEFAULT_DISPLAY_NAME, buildDefaultDriveBackupReminder, buildDefaultWhatsAppTemplates } from '@/db/defaults'
-import type { AppSettings, WhatsAppTemplates } from '@/types'
+import {
+  DEFAULT_ACTION_DISPLAY_MODE,
+  DEFAULT_DISPLAY_NAME,
+  DEFAULT_THEME_PREFERENCE,
+  buildDefaultDriveBackupReminder,
+  buildDefaultWhatsAppTemplates,
+} from '@/db/defaults'
+import type { ActionDisplayMode, AppSettings, ThemePreference, WhatsAppTemplates } from '@/types'
 
 /** Backfills fields added after a settings doc was first created — a database created before
  *  a new AppSettings field existed still has an old-shaped record, since Dexie doesn't enforce
@@ -12,6 +18,8 @@ export function withAppSettingsDefaults(settings: AppSettings): AppSettings {
     ...settings,
     displayName: settings.displayName ?? DEFAULT_DISPLAY_NAME,
     whatsappTemplates: settings.whatsappTemplates ?? buildDefaultWhatsAppTemplates(),
+    actionDisplayMode: settings.actionDisplayMode ?? DEFAULT_ACTION_DISPLAY_MODE,
+    themePreference: settings.themePreference ?? DEFAULT_THEME_PREFERENCE,
     driveBackupReminder: settings.driveBackupReminder ?? buildDefaultDriveBackupReminder(),
   }
 }
@@ -23,6 +31,8 @@ export async function getAppSettings(): Promise<AppSettings> {
     id: 'global',
     displayName: DEFAULT_DISPLAY_NAME,
     whatsappTemplates: buildDefaultWhatsAppTemplates(),
+    actionDisplayMode: DEFAULT_ACTION_DISPLAY_MODE,
+    themePreference: DEFAULT_THEME_PREFERENCE,
     driveBackupReminder: buildDefaultDriveBackupReminder(),
     updatedAt: nowIso(),
   }
@@ -33,6 +43,16 @@ export async function getAppSettings(): Promise<AppSettings> {
 export async function updateDisplayName(displayName: string): Promise<void> {
   const current = await getAppSettings()
   await db.appSettings.put({ ...current, displayName: displayName.trim(), updatedAt: nowIso() })
+}
+
+export async function updateActionDisplayMode(mode: ActionDisplayMode): Promise<void> {
+  const current = await getAppSettings()
+  await db.appSettings.put({ ...current, actionDisplayMode: mode, updatedAt: nowIso() })
+}
+
+export async function updateThemePreference(preference: ThemePreference): Promise<void> {
+  const current = await getAppSettings()
+  await db.appSettings.put({ ...current, themePreference: preference, updatedAt: nowIso() })
 }
 
 export async function updateWhatsAppTemplates(templates: WhatsAppTemplates): Promise<void> {

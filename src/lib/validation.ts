@@ -344,6 +344,8 @@ export const backupFileSchema = z
               .object({ monetary: z.string(), commodity: z.string() })
               .partial()
               .optional(),
+            actionDisplayMode: z.enum(['icon', 'text', 'both']).optional(),
+            themePreference: z.enum(['system', 'light', 'dark']).optional(),
             updatedAt: z.string().optional(),
           })
           .passthrough()

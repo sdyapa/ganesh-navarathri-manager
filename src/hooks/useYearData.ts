@@ -101,3 +101,8 @@ export function useAppSettings() {
     undefined,
   )
 }
+
+/** How row actions (Edit, Delete, Duplicate, etc.) should render — see ActionButton.tsx. */
+export function useActionDisplayMode() {
+  return useAppSettings()?.actionDisplayMode ?? 'text'
+}

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useUnits } from '@/hooks/useYearData'
 import { useToast } from '@/context/ToastContext'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
+import { ActionButton } from '@/components/common/ActionButton'
 import {
   deleteUnit,
   insertUnit,
@@ -11,6 +12,7 @@ import {
   restoreDefaultUnits,
   setUnitActive,
 } from '@/db/repositories/units'
+import { EDIT_ICON, DELETE_ICON } from '@/lib/actionIcons'
 import type { Unit } from '@/types'
 
 export function UnitSettings() {
@@ -96,16 +98,12 @@ export function UnitSettings() {
                   Save
                 </button>
               ) : (
-                <button type="button" className="link-button" onClick={() => setEditing({ id: u.id, name: u.name })}>
-                  Rename
-                </button>
+                <ActionButton icon={EDIT_ICON} label="Rename" onClick={() => setEditing({ id: u.id, name: u.name })} />
               )}
               <button type="button" className="link-button" onClick={() => setUnitActive(u.id, !u.active)}>
                 {u.active ? 'Deactivate' : 'Activate'}
               </button>
-              <button type="button" className="link-button link-button--danger" onClick={() => handleDeleteOrDeactivate(u)}>
-                Delete
-              </button>
+              <ActionButton icon={DELETE_ICON} label="Delete" danger onClick={() => handleDeleteOrDeactivate(u)} />
             </div>
           </li>
         ))}

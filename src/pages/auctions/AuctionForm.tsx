@@ -19,8 +19,8 @@ export function defaultAuctionFormValues(): AuctionFormValues {
   return { item: '', person: '', amount: '', date: todayDateOnly(), notes: '' }
 }
 
-export function auctionToFormValues(a: Auction): AuctionFormValues {
-  return { item: a.item, person: a.person, amount: String(a.amount), date: a.date, notes: a.notes ?? '' }
+export function auctionToFormValues(a: Auction, overrideDate?: string): AuctionFormValues {
+  return { item: a.item, person: a.person, amount: String(a.amount), date: overrideDate ?? a.date, notes: a.notes ?? '' }
 }
 
 interface AuctionFormProps {

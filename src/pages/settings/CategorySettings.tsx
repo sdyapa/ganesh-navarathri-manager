@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useCategories } from '@/hooks/useYearData'
 import { useToast } from '@/context/ToastContext'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
+import { ActionButton } from '@/components/common/ActionButton'
 import {
   deleteCategory,
   insertCategory,
@@ -11,6 +12,7 @@ import {
   restoreDefaultCategories,
   setCategoryActive,
 } from '@/db/repositories/categories'
+import { EDIT_ICON, DELETE_ICON } from '@/lib/actionIcons'
 import type { Category, CategoryKind } from '@/types'
 
 function CategoryList({ kind, title }: { kind: CategoryKind; title: string }) {
@@ -95,16 +97,12 @@ function CategoryList({ kind, title }: { kind: CategoryKind; title: string }) {
                   Save
                 </button>
               ) : (
-                <button type="button" className="link-button" onClick={() => setEditing({ id: c.id, name: c.name })}>
-                  Rename
-                </button>
+                <ActionButton icon={EDIT_ICON} label="Rename" onClick={() => setEditing({ id: c.id, name: c.name })} />
               )}
               <button type="button" className="link-button" onClick={() => setCategoryActive(c.id, !c.active)}>
                 {c.active ? 'Deactivate' : 'Activate'}
               </button>
-              <button type="button" className="link-button link-button--danger" onClick={() => handleDeleteOrDeactivate(c)}>
-                Delete
-              </button>
+              <ActionButton icon={DELETE_ICON} label="Delete" danger onClick={() => handleDeleteOrDeactivate(c)} />
             </div>
           </li>
         ))}

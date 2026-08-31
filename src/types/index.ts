@@ -198,6 +198,15 @@ export interface DriveBackupReminderSettings {
   lastBackupAt: IsoTimestamp | null
 }
 
+/** How row actions (Edit, Delete, Duplicate, Move to Expenses, etc.) render everywhere in the
+ *  app — 'text' matches the app's original appearance exactly, so this is the default and
+ *  nothing changes visually until a user opts into icons from Settings. */
+export type ActionDisplayMode = 'icon' | 'text' | 'both'
+
+/** 'system' follows the device/browser's own light/dark preference live; 'light'/'dark' pin an
+ *  explicit choice regardless of the device. See useTheme.ts for how this resolves. */
+export type ThemePreference = 'system' | 'light' | 'dark'
+
 export interface AppSettings {
   id: 'global'
   /** Customizable display name shown in the sidebar/top bar — lets a committee brand the app
@@ -206,6 +215,8 @@ export interface AppSettings {
    *  literal on BackupFile below, which identifies the backup *format*, not this preference. */
   displayName: string
   whatsappTemplates: WhatsAppTemplates
+  actionDisplayMode: ActionDisplayMode
+  themePreference: ThemePreference
   driveBackupReminder: DriveBackupReminderSettings
   updatedAt: IsoTimestamp
 }
@@ -277,6 +288,6 @@ export interface BackupFile {
     // Only the portable preferences travel in a backup. driveBackupReminder is deliberately
     // excluded — it's a per-device fact (this device's last backup time, its reminder cadence)
     // that restoring someone else's data shouldn't overwrite.
-    appSettings: Pick<AppSettings, 'displayName' | 'whatsappTemplates' | 'updatedAt'>
+    appSettings: Pick<AppSettings, 'displayName' | 'whatsappTemplates' | 'actionDisplayMode' | 'themePreference' | 'updatedAt'>
   }
 }

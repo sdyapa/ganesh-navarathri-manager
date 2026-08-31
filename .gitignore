@@ -9,4 +9,5 @@ coverage
 *.log
 .vite
 *.tsbuildinfo
+.claude/
 public/icons/*.png
