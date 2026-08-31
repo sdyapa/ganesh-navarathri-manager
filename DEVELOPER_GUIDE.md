@@ -366,6 +366,84 @@ present and active.
 `sortByKey(filteredRows, ...sortOption.split('-'))` — `sortByKey` is a single generic helper
 reused by every page rather than each page writing its own comparator.
 
+### 2.14 Row Action Icons & Display Mode
+
+| Layer | File(s) |
+|---|---|
+| Type | `ActionDisplayMode = 'icon' \| 'text' \| 'both'`, `AppSettings.actionDisplayMode` in `types/index.ts` — default `'text'` |
+| Icons | `lib/actionIcons.ts` — one named emoji constant per action (`EDIT_ICON`, `DELETE_ICON`, `DUPLICATE_ICON`, `COPY_ICON`, `MOVE_ICON`, `REVERT_ICON`, `DONE_ICON`/`UNDO_DONE_ICON`) |
+| Component | `components/common/ActionButton.tsx` — drop-in replacement for `<button className="link-button">Label</button>`; reads `useActionDisplayMode()` (`hooks/useYearData.ts`) and renders icon/text/both accordingly |
+| Settings | `pages/settings/AppearanceSettings.tsx`, wired into `SettingsPage.tsx`'s `SECTIONS` |
+| Tests | `describe('appearance settings (action display mode + theme)')` in `integration.test.ts` |
+
+Emoji, not an SVG/icon-font set — see the doc comment at the top of `actionIcons.ts` for why
+(they carry their own color, so both themes get free legibility with no `currentColor` work).
+`ActionButton` is used at every row-action call site across the list pages, Tasks, Calendar, and
+the Categories/Units/Profiles settings lists — a mechanical swap-in with no behavior change
+beyond the rendering mode. `.link-button`'s CSS gained a `display:inline-flex;gap:4px` (harmless
+for text-only) and a `.link-button--icon-only` modifier (drops the underline, which looks wrong
+on an emoji).
+
+### 2.15 Duplicate Entries
+
+| Layer | File(s) |
+|---|---|
+| Pages | `DonationsPage`/`ExpectedDonationsPage`, `ExpensesPage`/`ExpectedExpensesPage`, `AuctionsPage` — each gained a `{ mode: 'duplicate'; record: X }` branch on its `ModalState` union |
+
+No new repository or service function — Duplicate calls the same plain `insertX` used by "Add",
+just with `initialValues={xToFormValues(record, todayDateOnly())}` (reusing the override-date
+parameter already added for the convert/move flows — `auctionToFormValues` needed that parameter
+added, mirroring `donationToFormValues`/`expenseToFormValues`, which already had it) and
+`title="Duplicate {Entity}"`/`submitLabel="Save Duplicate"`. Deliberately always opens a
+reviewable, pre-filled form rather than inserting silently — the same convention every other
+record-creating flow in this app follows (Convert, Move, the Auction pledge, Copy-to-Expected).
+Scoped to Donations/Expenses/Auctions only; Tasks/Calendar don't have a Duplicate action.
+
+### 2.16 Dark Theme
+
+| Layer | File(s) |
+|---|---|
+| Type | `ThemePreference = 'system' \| 'light' \| 'dark'`, `AppSettings.themePreference` in `types/index.ts` — default `'system'` |
+| Hook | `hooks/useTheme.ts` → `useEffectiveTheme()` — resolves `'system'` against `window.matchMedia('(prefers-color-scheme: dark)')` live (a `change` listener, not a one-time read) |
+| Applier | `components/layout/ThemeApplier.tsx` — renders nothing, just keeps `document.documentElement.dataset.theme` in sync via `useEffect`; mounted once near the root in `App.tsx` |
+| CSS | `styles/global.css` — color tokens live under `:root, [data-theme="light"] { --color-*: ...; }` with a parallel `[data-theme="dark"] { --color-*: ...; }` override block |
+| Settings | `pages/settings/AppearanceSettings.tsx` (same page as §2.14) |
+
+**Why `:root, [data-theme="light"]`, not just `:root`**: `[data-theme="light"]` lets a
+*descendant* element re-assert light values even when an ancestor (`<html>`) has
+`[data-theme="dark"]` — this is exactly what the export functions in `lib/export/png.ts` rely on
+(see below) to force a subtree back to light regardless of the app's active theme.
+
+**Two hardcoded-color gotchas already fixed while building this** (both patterns to remember if
+you add more theme-varying UI):
+
+1. **`.toast`'s background was `var(--color-text)`** — a deliberate light-mode trick reusing
+   "always near-black" for a dark chip background, which breaks the instant `--color-text`
+   becomes near-white in dark mode. Fixed by hardcoding the toast to a fixed, theme-independent
+   dark color instead (a toast is meant to look the same dark overlay chip in both themes, like
+   most apps' snackbars) — don't reuse a semantic color token for an incidental "happens to be
+   dark" purpose.
+2. **`color` is inherited, custom properties are not retroactive** — `lib/export/png.ts`
+   originally forced exports back to light with `element.setAttribute('data-theme', 'light')`
+   alone. That correctly re-scopes any CSS rule that freshly reads `var(--color-*)` *within* the
+   subtree (e.g. `.data-table thead th`'s `color: var(--color-primary-dark)`), but plain
+   `.data-table td` text has no explicit `color` rule at all — it just inherits `body`'s already-
+   computed `color`, which resolved dark if the app's theme was dark, and inheritance carries the
+   *computed value*, not a live binding to the custom property. Setting `data-theme="light"` on a
+   descendant cannot retroactively fix a `color` value already inherited from further up the
+   tree. Fixed by **also** setting an explicit, hardcoded `color` on the exported subtree/
+   container itself (`exportElementAsPng` and `exportTableReportAsPng` both do this now) — don't
+   assume `data-theme` scoping alone fixes inherited (as opposed to freshly-declared) properties.
+
+**Exports stay theme-independent** (verified by exporting a PNG while dark mode is active and
+confirming the row text is legible dark-on-white, not near-invisible):
+- `lib/export/pdf.ts` needs no changes — jsPDF draws via its own hardcoded RGB calls, never CSS.
+- `lib/chartSetup.ts`'s `CHART_COLORS` are fixed hex values, not theme-derived — charts already
+  render identically in both themes.
+- `lib/export/png.ts`'s `exportElementAsPng` and `exportTableReportAsPng` both set
+  `data-theme="light"` **and** an explicit `color` override on the captured element/container
+  (see gotcha #2 above), restoring the original values in a `finally` block afterward.
+
 ## 3. Cross-Cutting Systems
 
 These aren't features on their own, but almost every feature above depends on them.

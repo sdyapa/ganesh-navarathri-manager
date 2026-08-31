@@ -158,6 +158,29 @@ Defaults can always be restored if accidentally removed.
 - Card-based lists on phones, full tables on larger screens; bottom navigation on mobile, a
   sidebar on desktop.
 
+### 2.13 Row Action Icons & Display Mode
+
+Every row action — Edit, Delete, Duplicate, Copy WhatsApp, Move to Expenses, Convert to
+Donation, Move back to Expected, Mark Done, Rename — can show as an icon, as text, or both.
+**Settings → Appearance** has an Icon only / Text only / Icon + Text switch that applies
+everywhere at once; it defaults to Text only, matching the app's original look, so nothing
+changes until you opt in.
+
+### 2.14 Duplicate Entries
+
+Donations, Expenses, and Auctions (Actual and Expected alike) can be **Duplicated** — this opens
+the same Add-style form pre-filled with the source record's values and today's date, so you can
+review and adjust anything (amount, donor, date) before it's saved as a brand-new record. The
+original is never touched. Useful for near-identical repeat entries within the same season.
+
+### 2.15 Dark Theme
+
+**Settings → Appearance** also has a System / Light / Dark switch. "System" (the default) follows
+your phone or browser's own light/dark setting automatically and updates live if you change it
+there — no explicit choice needed. PDF and PNG exports always render the same light, printable
+way regardless of which theme is active on screen, so a report shared over WhatsApp always looks
+consistent no matter who generates it or what theme they're using.
+
 ## 3. Technology Stack
 
 | Concern | Choice | Why |
