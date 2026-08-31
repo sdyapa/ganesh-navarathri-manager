@@ -1,7 +1,8 @@
-import { useState, type FormEvent } from 'react'
+import { useId, useState, type FormEvent } from 'react'
 import { Modal } from '@/components/common/Modal'
 import { FormField } from '@/components/common/FormField'
 import { useCloseGuard } from '@/hooks/useCloseGuard'
+import { useProfiles } from '@/hooks/useYearData'
 import { expenseInputSchema, type ExpenseInput } from '@/lib/validation'
 import { todayDateOnly } from '@/lib/date'
 import type { Category, Expense, ExpectedExpense } from '@/types'
@@ -12,10 +13,11 @@ export interface ExpenseFormValues {
   date: string
   categoryId: string
   notes: string
+  vendorName: string
 }
 
 export function defaultExpenseFormValues(categories: Category[]): ExpenseFormValues {
-  return { description: '', amount: '', date: todayDateOnly(), categoryId: categories[0]?.id ?? '', notes: '' }
+  return { description: '', amount: '', date: todayDateOnly(), categoryId: categories[0]?.id ?? '', notes: '', vendorName: '' }
 }
 
 export function expenseToFormValues(e: Expense | ExpectedExpense, overrideDate?: string): ExpenseFormValues {
@@ -25,6 +27,7 @@ export function expenseToFormValues(e: Expense | ExpectedExpense, overrideDate?:
     date: overrideDate ?? e.date,
     categoryId: e.categoryId,
     notes: e.notes ?? '',
+    vendorName: e.vendorName ?? '',
   }
 }
 
@@ -43,6 +46,8 @@ export function ExpenseForm({ title, submitLabel, initialValues, categories, onS
   const [submitting, setSubmitting] = useState(false)
   const { requestClose, confirmDialog } = useCloseGuard(values, initialValues, onClose)
   const activeCategories = categories.filter((c) => c.active || c.id === values.categoryId)
+  const vendorProfiles = useProfiles('vendor')
+  const vendorListId = useId()
 
   const set = <K extends keyof ExpenseFormValues>(key: K, value: ExpenseFormValues[K]) =>
     setValues((prev) => ({ ...prev, [key]: value }))
@@ -56,6 +61,7 @@ export function ExpenseForm({ title, submitLabel, initialValues, categories, onS
       date: values.date,
       categoryId: values.categoryId,
       notes: values.notes || undefined,
+      vendorName: values.vendorName || undefined,
     })
     if (!parsed.success) {
       const fieldErrors: Record<string, string> = {}
@@ -97,6 +103,18 @@ export function ExpenseForm({ title, submitLabel, initialValues, categories, onS
             onChange={(e) => set('description', e.target.value)}
             autoFocus
           />
+        </FormField>
+        <FormField label="Vendor" htmlFor="vendorName" error={errors.vendorName} hint="Optional — who the expense was paid to">
+          <input
+            id="vendorName"
+            type="text"
+            list={vendorListId}
+            value={values.vendorName}
+            onChange={(e) => set('vendorName', e.target.value)}
+          />
+          <datalist id={vendorListId}>
+            {vendorProfiles?.map((p) => <option key={p.id} value={p.name} />)}
+          </datalist>
         </FormField>
         <div className="form-row">
           <FormField label="Amount (₹)" htmlFor="amount" required error={errors.amount}>

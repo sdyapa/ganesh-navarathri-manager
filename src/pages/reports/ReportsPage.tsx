@@ -68,21 +68,16 @@ export function ReportsPage() {
     [auctions, dateFrom, dateTo],
   )
 
+  // Auction proceeds are deliberately NOT folded in here (unlike an earlier version of this
+  // page) — they aren't collected donation revenue yet, only a pledge for next year (see
+  // FinancialSummary's doc comments). The "Donations vs Auction vs Expenses" chart below shows
+  // auction proceeds honestly as its own distinct bar instead.
   const donationCategoryTotals = useMemo(() => {
     if (loading) return []
     const monetary = filteredDonations.filter((d) => d.type === 'monetary')
-    const totals = computeCategoryTotals(monetary, donationCategories!)
-    if (filteredAuctions.length > 0) {
-      totals.push({
-        categoryId: '__auction__',
-        categoryName: 'Auction',
-        total: filteredAuctions.reduce((s, a) => s + a.amount, 0),
-        count: filteredAuctions.length,
-      })
-    }
-    return totals.sort((a, b) => b.total - a.total)
+    return computeCategoryTotals(monetary, donationCategories!)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, filteredDonations, filteredAuctions, donationCategories])
+  }, [loading, filteredDonations, donationCategories])
 
   const expenseCategoryTotals = useMemo(() => {
     if (loading) return []
@@ -165,9 +160,9 @@ export function ReportsPage() {
         summaryLines: [
           ...(dateFrom || dateTo ? [`Date range: ${dateFrom ? formatDisplayDate(dateFrom) : 'start'} to ${dateTo ? formatDisplayDate(dateTo) : 'today'}`] : []),
           `Monetary Donations: ${formatCurrency(filteredSummary.totalMonetaryDonations)}`,
-          `Auction Proceeds: ${formatCurrency(filteredSummary.totalAuctionProceeds)}`,
           `Total Expenses: ${formatCurrency(filteredSummary.totalExpenses)}`,
           `Closing Balance: ${formatCurrency(filteredSummary.closingBalance)}`,
+          `Auction Proceeds (pledged, collected next year): ${formatCurrency(filteredSummary.totalAuctionProceeds)}`,
         ],
       })
     } catch {

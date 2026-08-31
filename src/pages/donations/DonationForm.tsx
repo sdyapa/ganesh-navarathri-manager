@@ -1,7 +1,8 @@
-import { useState, type FormEvent } from 'react'
+import { useId, useState, type FormEvent, type ReactNode } from 'react'
 import { Modal } from '@/components/common/Modal'
 import { FormField } from '@/components/common/FormField'
 import { useCloseGuard } from '@/hooks/useCloseGuard'
+import { useProfiles } from '@/hooks/useYearData'
 import { donationInputSchema, type DonationInput } from '@/lib/validation'
 import { todayDateOnly } from '@/lib/date'
 import type { Category, Donation, DonationType, ExpectedDonation, Unit } from '@/types'
@@ -49,6 +50,9 @@ export function donationToFormValues(d: Donation | ExpectedDonation, overrideDat
 interface DonationFormProps {
   title: string
   submitLabel: string
+  /** Optional context shown above the form fields — e.g. which year a conversion will land
+   *  in. Omitted by plain Add/Edit Donation usage. */
+  description?: ReactNode
   initialValues: DonationFormValues
   categories: Category[]
   units: Unit[]
@@ -56,11 +60,13 @@ interface DonationFormProps {
   onClose: () => void
 }
 
-export function DonationForm({ title, submitLabel, initialValues, categories, units, onSubmit, onClose }: DonationFormProps) {
+export function DonationForm({ title, submitLabel, description, initialValues, categories, units, onSubmit, onClose }: DonationFormProps) {
   const [values, setValues] = useState(initialValues)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const { requestClose, confirmDialog } = useCloseGuard(values, initialValues, onClose)
+  const donorProfiles = useProfiles('person')
+  const donorListId = useId()
 
   const activeCategories = categories.filter((c) => c.active || c.id === values.categoryId)
   const activeUnits = units.filter((u) => u.active || u.id === values.unitId)
@@ -114,14 +120,19 @@ export function DonationForm({ title, submitLabel, initialValues, categories, un
       }
     >
       <form id="donation-form" onSubmit={handleSubmit} noValidate>
+        {description && <p className="page__note">{description}</p>}
         <FormField label="Donor Name" htmlFor="donorName" required error={errors.donorName}>
           <input
             id="donorName"
             type="text"
+            list={donorListId}
             value={values.donorName}
             onChange={(e) => set('donorName', e.target.value)}
             autoFocus
           />
+          <datalist id={donorListId}>
+            {donorProfiles?.map((p) => <option key={p.id} value={p.name} />)}
+          </datalist>
         </FormField>
 
         <FormField label="Donation Type" htmlFor="type" required>

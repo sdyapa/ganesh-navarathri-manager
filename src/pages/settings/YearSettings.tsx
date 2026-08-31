@@ -7,7 +7,16 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { FormField } from '@/components/common/FormField'
 import { SummaryList } from '@/components/common/SummaryList'
 import { yearProfileInputSchema } from '@/lib/validation'
-import { createYearProfile, deleteYear, getYearDeletionImpact, renameYearProfile, setYearArchived } from '@/services/yearService'
+import {
+  applyCarryForwardOpeningBalance,
+  createYearProfile,
+  deleteYear,
+  findMostRecentPriorYear,
+  getYearClosingBalance,
+  getYearDeletionImpact,
+  renameYearProfile,
+  setYearArchived,
+} from '@/services/yearService'
 import { formatCurrency } from '@/lib/currency'
 import type { YearProfile } from '@/types'
 
@@ -21,6 +30,11 @@ export function YearSettings() {
   const [renameValue, setRenameValue] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<YearProfile | null>(null)
   const [deleteImpact, setDeleteImpact] = useState<Awaited<ReturnType<typeof getYearDeletionImpact>> | null>(null)
+  const [carryForwardTarget, setCarryForwardTarget] = useState<{
+    year: YearProfile
+    source: YearProfile
+    newOpeningBalance: number
+  } | null>(null)
   const [busy, setBusy] = useState(false)
 
   const [form, setForm] = useState(() => {
@@ -93,6 +107,29 @@ export function YearSettings() {
     }
   }
 
+  async function openCarryForward(year: YearProfile) {
+    const source = findMostRecentPriorYear(years, year.year)
+    if (!source) return // the button is hidden in this case, but guard anyway
+    const newOpeningBalance = await getYearClosingBalance(source.id)
+    setCarryForwardTarget({ year, source, newOpeningBalance })
+  }
+
+  async function confirmCarryForward() {
+    if (!carryForwardTarget) return
+    setBusy(true)
+    try {
+      await applyCarryForwardOpeningBalance(
+        carryForwardTarget.year.id,
+        carryForwardTarget.source.id,
+        carryForwardTarget.newOpeningBalance,
+      )
+      showToast(`Opening balance updated to ${formatCurrency(carryForwardTarget.newOpeningBalance)}`)
+      setCarryForwardTarget(null)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="settings-section">
       <div className="settings-section__header">
@@ -129,6 +166,11 @@ export function YearSettings() {
                     {y.id !== currentYearId && (
                       <button type="button" className="link-button" onClick={() => setCurrentYearId(y.id)}>
                         Switch to this year
+                      </button>
+                    )}
+                    {findMostRecentPriorYear(years, y.year) && (
+                      <button type="button" className="link-button" onClick={() => openCarryForward(y)}>
+                        Carry Forward Balance
                       </button>
                     )}
                     <button
@@ -249,6 +291,27 @@ export function YearSettings() {
             setDeleteTarget(null)
             setDeleteImpact(null)
           }}
+          busy={busy}
+        />
+      )}
+
+      {carryForwardTarget && (
+        <ConfirmDialog
+          title="Carry Forward Balance?"
+          description={`This replaces ${carryForwardTarget.year.name}'s opening balance with ${carryForwardTarget.source.name}'s closing balance.`}
+          summary={
+            <SummaryList
+              rows={[
+                { label: 'Source Year', value: carryForwardTarget.source.name },
+                { label: 'Source Year Closing Balance', value: formatCurrency(carryForwardTarget.newOpeningBalance) },
+                { label: 'Current Opening Balance', value: formatCurrency(carryForwardTarget.year.openingBalance) },
+                { label: 'New Opening Balance', value: formatCurrency(carryForwardTarget.newOpeningBalance) },
+              ]}
+            />
+          }
+          confirmLabel="Carry Forward"
+          onConfirm={confirmCarryForward}
+          onCancel={() => setCarryForwardTarget(null)}
           busy={busy}
         />
       )}

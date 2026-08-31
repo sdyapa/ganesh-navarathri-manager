@@ -48,9 +48,9 @@ export function Dashboard() {
         summaryLines: [
           `Opening Balance: ${formatCurrency(summary.openingBalance)}`,
           `Monetary Donations: ${formatCurrency(summary.totalMonetaryDonations)} (${summary.counts.monetaryDonations})`,
-          `Auction Proceeds: ${formatCurrency(summary.totalAuctionProceeds)} (${summary.counts.auctions})`,
           `Total Expenses: ${formatCurrency(summary.totalExpenses)} (${summary.counts.expenses})`,
           `Closing Balance: ${formatCurrency(summary.closingBalance)}`,
+          `Auction Proceeds (pledged, collected next year): ${formatCurrency(summary.totalAuctionProceeds)} (${summary.counts.auctions})`,
         ],
       })
     } catch {
@@ -109,12 +109,6 @@ export function Dashboard() {
             tone="muted"
           />
           <StatCard
-            label="Auction Proceeds"
-            value={formatCurrency(summary.totalAuctionProceeds)}
-            hint={`${summary.counts.auctions} item(s)`}
-            tone="positive"
-          />
-          <StatCard
             label="Expenses"
             value={formatCurrency(summary.totalExpenses)}
             hint={`${summary.counts.expenses} entr(y/ies)`}
@@ -147,10 +141,16 @@ export function Dashboard() {
             hint={`${summary.counts.expectedExpenses} pending`}
             tone="muted"
           />
+          <StatCard
+            label="Auction Proceeds"
+            value={formatCurrency(summary.totalAuctionProceeds)}
+            hint={`${summary.counts.auctions} item(s) — collected next year`}
+            tone="muted"
+          />
         </div>
         <p className="page__note">
-          Expected amounts are shown for planning only — they do not affect the actual closing balance above until
-          converted.
+          Expected amounts (and auction proceeds, which are pledged but collected the following year) are shown for
+          planning only — they do not affect the actual closing balance above until converted.
         </p>
       </section>
       </div>

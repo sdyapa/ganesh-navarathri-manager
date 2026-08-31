@@ -73,6 +73,7 @@ export function ExpectedExpensesPage() {
   function handleEditSubmit(record: ExpectedExpense, input: ExpenseInput) {
     const changes = diffFields([
       ['Description', record.description, input.description],
+      ['Vendor', record.vendorName ?? '', input.vendorName ?? ''],
       ['Amount', formatCurrency(record.amount), formatCurrency(input.amount)],
       ['Category', categoryName(record.categoryId), categoryName(input.categoryId)],
       ['Expected Date', formatDisplayDate(record.date), formatDisplayDate(input.date)],
@@ -274,6 +275,7 @@ export function ExpectedExpensesPage() {
             <FieldDiffList
               changes={diffFields([
                 ['Description', pendingEdit.record.description, pendingEdit.input.description],
+                ['Vendor', pendingEdit.record.vendorName ?? '', pendingEdit.input.vendorName ?? ''],
                 ['Amount', formatCurrency(pendingEdit.record.amount), formatCurrency(pendingEdit.input.amount)],
                 ['Category', categoryName(pendingEdit.record.categoryId), categoryName(pendingEdit.input.categoryId)],
                 ['Expected Date', formatDisplayDate(pendingEdit.record.date), formatDisplayDate(pendingEdit.input.date)],

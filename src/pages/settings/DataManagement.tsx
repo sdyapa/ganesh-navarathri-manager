@@ -217,6 +217,7 @@ export function DataManagement() {
               { label: 'Auctions', value: String(inspection.summary.totals.auctions) },
               { label: 'Categories Included', value: String(inspection.summary.categoryCount) },
               { label: 'Units Included', value: String(inspection.summary.unitCount) },
+              { label: 'People/Vendors Included', value: String(inspection.summary.profileCount) },
             ]}
           />
 

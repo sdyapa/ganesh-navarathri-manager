@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { SectionTabs } from '@/components/common/SectionTabs'
 import { useYearContext } from '@/context/YearContext'
@@ -22,7 +22,7 @@ import { matchesSearch } from '@/lib/tableUtils'
 import { diffFields } from '@/lib/diff'
 import { buildPdfReport, pdfFileName } from '@/lib/export/pdf'
 import { buildMonetaryDonationsTable, buildCommodityDonationsTable } from '@/lib/export/reportBuilders'
-import { exportElementAsPng, pngFileName } from '@/lib/export/png'
+import { exportTableReportAsPng, pngFileName } from '@/lib/export/png'
 import { getAppSettings } from '@/db/repositories/settings'
 import type { DonationInput } from '@/lib/validation'
 import type { Donation } from '@/types'
@@ -31,7 +31,6 @@ type ModalState = { mode: 'closed' } | { mode: 'add' } | { mode: 'edit'; donatio
 
 export function DonationsPage() {
   const { currentYearId, currentYear } = useYearContext()
-  const reportRef = useRef<HTMLDivElement>(null)
   const donations = useDonations(currentYearId)
   const categories = useCategories('donation')
   const units = useUnits()
@@ -153,12 +152,12 @@ export function DonationsPage() {
   }
 
   async function handleExportPng() {
-    if (!currentYear || !reportRef.current) return
+    if (!currentYear) return
     try {
       const { displayName } = await getAppSettings()
       const monetaryTotal = filtered.filter((d) => d.type === 'monetary').reduce((s, d) => s + (d.amount ?? 0), 0)
       const commodityCount = filtered.filter((d) => d.type === 'commodity').length
-      await exportElementAsPng(reportRef.current, pngFileName(currentYear.name, 'Donations Report'), {
+      await exportTableReportAsPng(pngFileName(currentYear.name, 'Donations Report'), {
         appName: displayName,
         reportTitle: 'Donations Report',
         yearName: currentYear.name,
@@ -166,6 +165,10 @@ export function DonationsPage() {
           `Total Monetary Donations: ${formatCurrency(monetaryTotal)}`,
           `Commodity Donations: ${commodityCount}`,
           `Total Records: ${filtered.length}`,
+        ],
+        tables: [
+          { heading: 'Monetary Donations', table: buildMonetaryDonationsTable(filtered, categories!, formatCurrency) },
+          { heading: 'Commodity Donations', table: buildCommodityDonationsTable(filtered, categories!, units!) },
         ],
       })
     } catch {
@@ -263,7 +266,7 @@ export function DonationsPage() {
           {filtered.length === 0 ? (
             <EmptyState title="No matching donations" description="Try adjusting your search or filters." />
           ) : (
-            <div ref={reportRef}>
+            <>
               <DataTable
                 columns={columns}
                 data={pageItems}
@@ -296,7 +299,7 @@ export function DonationsPage() {
                 )}
               />
               <Pagination page={page} totalPages={totalPages} hasNext={hasNext} hasPrev={hasPrev} onNext={next} onPrev={prev} />
-            </div>
+            </>
           )}
         </>
       )}

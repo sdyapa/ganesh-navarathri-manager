@@ -3,6 +3,7 @@ import { GeneralSettings } from './GeneralSettings'
 import { YearSettings } from './YearSettings'
 import { CategorySettings } from './CategorySettings'
 import { UnitSettings } from './UnitSettings'
+import { ProfileSettings } from './ProfileSettings'
 import { WhatsAppSettings } from './WhatsAppSettings'
 import { DataManagement } from './DataManagement'
 import { GoogleDriveSettings } from './GoogleDriveSettings'
@@ -12,6 +13,7 @@ const SECTIONS = [
   { key: 'years', label: 'Years & Profiles' },
   { key: 'categories', label: 'Categories' },
   { key: 'units', label: 'Units' },
+  { key: 'profiles', label: 'People & Vendors' },
   { key: 'whatsapp', label: 'WhatsApp Templates' },
   { key: 'data', label: 'Data Management' },
   { key: 'google', label: 'Google Drive' },
@@ -53,6 +55,7 @@ export function SettingsPage() {
         {section === 'years' && <YearSettings />}
         {section === 'categories' && <CategorySettings />}
         {section === 'units' && <UnitSettings />}
+        {section === 'profiles' && <ProfileSettings />}
         {section === 'whatsapp' && <WhatsAppSettings />}
         {section === 'data' && <DataManagement />}
         {section === 'google' && <GoogleDriveSettings />}

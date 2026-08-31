@@ -1,7 +1,8 @@
-import { useState, type FormEvent } from 'react'
+import { useId, useState, type FormEvent } from 'react'
 import { Modal } from '@/components/common/Modal'
 import { FormField } from '@/components/common/FormField'
 import { useCloseGuard } from '@/hooks/useCloseGuard'
+import { useProfiles } from '@/hooks/useYearData'
 import { auctionInputSchema, type AuctionInput } from '@/lib/validation'
 import { todayDateOnly } from '@/lib/date'
 import type { Auction } from '@/types'
@@ -35,6 +36,8 @@ export function AuctionForm({ title, submitLabel, initialValues, onSubmit, onClo
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
   const { requestClose, confirmDialog } = useCloseGuard(values, initialValues, onClose)
+  const personProfiles = useProfiles('person')
+  const personListId = useId()
 
   const set = <K extends keyof AuctionFormValues>(key: K, value: AuctionFormValues[K]) =>
     setValues((prev) => ({ ...prev, [key]: value }))
@@ -85,7 +88,16 @@ export function AuctionForm({ title, submitLabel, initialValues, onSubmit, onClo
           <input id="item" type="text" value={values.item} onChange={(e) => set('item', e.target.value)} autoFocus />
         </FormField>
         <FormField label="Person" htmlFor="person" required error={errors.person}>
-          <input id="person" type="text" value={values.person} onChange={(e) => set('person', e.target.value)} />
+          <input
+            id="person"
+            type="text"
+            list={personListId}
+            value={values.person}
+            onChange={(e) => set('person', e.target.value)}
+          />
+          <datalist id={personListId}>
+            {personProfiles?.map((p) => <option key={p.id} value={p.name} />)}
+          </datalist>
         </FormField>
         <div className="form-row">
           <FormField label="Amount (₹)" htmlFor="amount" required error={errors.amount}>

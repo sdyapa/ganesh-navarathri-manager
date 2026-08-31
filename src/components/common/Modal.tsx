@@ -11,10 +11,18 @@ interface ModalProps {
 
 export function Modal({ title, onClose, children, footer, size = 'md' }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
+  // Read via a ref inside the effect below rather than listing onClose as a dependency —
+  // callers typically pass a fresh inline function (or, as with useCloseGuard's requestClose,
+  // a non-memoized closure) on every render, which previously re-ran the mount effect on every
+  // keystroke inside the form and called dialogRef.current?.focus(), yanking focus away from
+  // whatever input the user was typing into. The ref keeps Escape always calling the latest
+  // onClose without that effect re-running on every render.
+  const onCloseRef = useRef(onClose)
+  onCloseRef.current = onClose
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') onCloseRef.current()
     }
     document.addEventListener('keydown', onKeyDown)
     dialogRef.current?.focus()
@@ -24,7 +32,8 @@ export function Modal({ title, onClose, children, footer, size = 'md' }: ModalPr
       document.removeEventListener('keydown', onKeyDown)
       document.body.style.overflow = previousOverflow
     }
-  }, [onClose])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately mount/unmount only, see comment above
+  }, [])
 
   return createPortal(
     <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>

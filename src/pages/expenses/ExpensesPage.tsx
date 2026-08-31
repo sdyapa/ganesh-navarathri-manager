@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { SectionTabs } from '@/components/common/SectionTabs'
 import { useYearContext } from '@/context/YearContext'
@@ -21,7 +21,7 @@ import { matchesSearch } from '@/lib/tableUtils'
 import { diffFields } from '@/lib/diff'
 import { buildPdfReport, pdfFileName } from '@/lib/export/pdf'
 import { buildExpensesTable } from '@/lib/export/reportBuilders'
-import { exportElementAsPng, pngFileName } from '@/lib/export/png'
+import { exportTableReportAsPng, pngFileName } from '@/lib/export/png'
 import { getAppSettings } from '@/db/repositories/settings'
 import type { ExpenseInput } from '@/lib/validation'
 import type { Expense } from '@/types'
@@ -30,7 +30,6 @@ type ModalState = { mode: 'closed' } | { mode: 'add' } | { mode: 'edit'; expense
 
 export function ExpensesPage() {
   const { currentYearId, currentYear } = useYearContext()
-  const reportRef = useRef<HTMLDivElement>(null)
   const expenses = useExpenses(currentYearId)
   const categories = useCategories('expense')
   const { showToast } = useToast()
@@ -75,6 +74,7 @@ export function ExpensesPage() {
   function handleEditSubmit(original: Expense, input: ExpenseInput) {
     const changes = diffFields([
       ['Description', original.description, input.description],
+      ['Vendor', original.vendorName ?? '', input.vendorName ?? ''],
       ['Amount', formatCurrency(original.amount), formatCurrency(input.amount)],
       ['Category', categoryName(original.categoryId), categoryName(input.categoryId)],
       ['Date', formatDisplayDate(original.date), formatDisplayDate(input.date)],
@@ -131,15 +131,16 @@ export function ExpensesPage() {
   }
 
   async function handleExportPng() {
-    if (!currentYear || !reportRef.current) return
+    if (!currentYear) return
     try {
       const { displayName } = await getAppSettings()
       const total = filtered.reduce((s, e) => s + e.amount, 0)
-      await exportElementAsPng(reportRef.current, pngFileName(currentYear.name, 'Expenses Report'), {
+      await exportTableReportAsPng(pngFileName(currentYear.name, 'Expenses Report'), {
         appName: displayName,
         reportTitle: 'Expenses Report',
         yearName: currentYear.name,
         summaryLines: [`Total Expenses: ${formatCurrency(total)}`, `Total Records: ${filtered.length}`],
+        tables: [{ table: buildExpensesTable(filtered, categories!, formatCurrency) }],
       })
     } catch {
       showToast('Could not generate image. Please try again.', 'error')
@@ -212,7 +213,7 @@ export function ExpensesPage() {
           {filtered.length === 0 ? (
             <EmptyState title="No matching expenses" description="Try adjusting your search or filters." />
           ) : (
-            <div ref={reportRef}>
+            <>
               <DataTable
                 columns={columns}
                 data={pageItems}
@@ -239,7 +240,7 @@ export function ExpensesPage() {
                 )}
               />
               <Pagination page={page} totalPages={totalPages} hasNext={hasNext} hasPrev={hasPrev} onNext={next} onPrev={prev} />
-            </div>
+            </>
           )}
         </>
       )}
@@ -277,6 +278,7 @@ export function ExpensesPage() {
             <FieldDiffList
               changes={diffFields([
                 ['Description', pendingEdit.expense.description, pendingEdit.input.description],
+                ['Vendor', pendingEdit.expense.vendorName ?? '', pendingEdit.input.vendorName ?? ''],
                 ['Amount', formatCurrency(pendingEdit.expense.amount), formatCurrency(pendingEdit.input.amount)],
                 ['Category', categoryName(pendingEdit.expense.categoryId), categoryName(pendingEdit.input.categoryId)],
                 ['Date', formatDisplayDate(pendingEdit.expense.date), formatDisplayDate(pendingEdit.input.date)],
