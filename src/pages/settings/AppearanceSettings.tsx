@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react'
 import { useAppSettings } from '@/hooks/useYearData'
 import { useToast } from '@/context/ToastContext'
-import { updateActionDisplayMode, updateThemePreference } from '@/db/repositories/settings'
+import { updateActionDisplayMode, updateDashboardTaskPreviewCount, updateThemePreference } from '@/db/repositories/settings'
+import { dashboardTaskPreviewCountSchema } from '@/lib/validation'
 import type { ActionDisplayMode, ThemePreference } from '@/types'
 
 const ACTION_DISPLAY_OPTIONS: Array<{ value: ActionDisplayMode; label: string }> = [
@@ -18,6 +20,17 @@ const THEME_OPTIONS: Array<{ value: ThemePreference; label: string }> = [
 export function AppearanceSettings() {
   const settings = useAppSettings()
   const { showToast } = useToast()
+  const [taskPreviewInput, setTaskPreviewInput] = useState('')
+  const [taskPreviewError, setTaskPreviewError] = useState<string | null>(null)
+
+  // Depends on the field itself, not the whole `settings` object — saving the Row Actions or
+  // Theme control above updates this same shared settings document, which would otherwise reset
+  // an unsaved, just-typed count back to the saved value (see WhatsAppSettings.tsx for the same
+  // class of bug and a longer explanation).
+  useEffect(() => {
+    if (settings) setTaskPreviewInput(String(settings.dashboardTaskPreviewCount))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings?.dashboardTaskPreviewCount])
 
   if (!settings) return null
 
@@ -29,6 +42,17 @@ export function AppearanceSettings() {
   async function handleTheme(preference: ThemePreference) {
     await updateThemePreference(preference)
     showToast('Theme updated')
+  }
+
+  async function handleSaveTaskPreviewCount() {
+    const parsed = dashboardTaskPreviewCountSchema.safeParse(Number(taskPreviewInput))
+    if (!parsed.success) {
+      setTaskPreviewError(parsed.error.issues[0].message)
+      return
+    }
+    setTaskPreviewError(null)
+    await updateDashboardTaskPreviewCount(parsed.data)
+    showToast('Dashboard "Heads Up" count updated')
   }
 
   return (
@@ -76,6 +100,35 @@ export function AppearanceSettings() {
             </button>
           ))}
         </div>
+      </div>
+
+      <div className="settings-subsection">
+        <h3>Dashboard "Heads Up"</h3>
+        <p className="page__note">
+          How many upcoming pending tasks show in the Dashboard's "Heads Up" preview. Set to 0 to hide the section
+          entirely.
+        </p>
+        <div className="inline-form">
+          <label htmlFor="dashboard-task-preview-count">Show</label>
+          <input
+            id="dashboard-task-preview-count"
+            type="number"
+            min="0"
+            max="20"
+            value={taskPreviewInput}
+            onChange={(e) => setTaskPreviewInput(e.target.value)}
+            style={{ width: 70 }}
+          />
+          <span>upcoming task(s)</span>
+          <button type="button" className="button button--secondary" onClick={handleSaveTaskPreviewCount}>
+            Save
+          </button>
+        </div>
+        {taskPreviewError && (
+          <p className="form-field__error" role="alert">
+            {taskPreviewError}
+          </p>
+        )}
       </div>
     </div>
   )

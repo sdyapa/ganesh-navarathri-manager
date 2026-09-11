@@ -273,6 +273,7 @@ export async function applyBackupImport(backup: ParsedBackupFile, mode: ImportMo
             : currentSettings.whatsappTemplates,
           actionDisplayMode: backup.settings.appSettings?.actionDisplayMode ?? currentSettings.actionDisplayMode,
           themePreference: backup.settings.appSettings?.themePreference ?? currentSettings.themePreference,
+          dashboardTaskPreviewCount: backup.settings.appSettings?.dashboardTaskPreviewCount ?? currentSettings.dashboardTaskPreviewCount,
           driveBackupReminder: currentSettings.driveBackupReminder,
           updatedAt: nowIso(),
         })

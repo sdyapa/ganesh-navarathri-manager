@@ -217,6 +217,9 @@ export interface AppSettings {
   whatsappTemplates: WhatsAppTemplates
   actionDisplayMode: ActionDisplayMode
   themePreference: ThemePreference
+  /** How many upcoming (pending) tasks show in the Dashboard's "Heads Up" preview — see
+   *  Dashboard.tsx. Defaults to 3; a committee with a busier task list can raise it. */
+  dashboardTaskPreviewCount: number
   driveBackupReminder: DriveBackupReminderSettings
   updatedAt: IsoTimestamp
 }
@@ -288,6 +291,9 @@ export interface BackupFile {
     // Only the portable preferences travel in a backup. driveBackupReminder is deliberately
     // excluded — it's a per-device fact (this device's last backup time, its reminder cadence)
     // that restoring someone else's data shouldn't overwrite.
-    appSettings: Pick<AppSettings, 'displayName' | 'whatsappTemplates' | 'actionDisplayMode' | 'themePreference' | 'updatedAt'>
+    appSettings: Pick<
+      AppSettings,
+      'displayName' | 'whatsappTemplates' | 'actionDisplayMode' | 'themePreference' | 'dashboardTaskPreviewCount' | 'updatedAt'
+    >
   }
 }

@@ -1,12 +1,15 @@
-import { useRef } from 'react'
+import { useMemo, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useYearSummary } from '@/hooks/useYearSummary'
+import { useYearContext } from '@/context/YearContext'
+import { useTasks, useAppSettings } from '@/hooks/useYearData'
 import { StatCard } from '@/components/common/StatCard'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ExportButtons } from '@/components/common/ExportButtons'
 import { useToast } from '@/context/ToastContext'
 import { formatCurrency } from '@/lib/currency'
 import { formatDisplayDate, todayDateOnly } from '@/lib/date'
+import { sortByKey } from '@/lib/tableUtils'
 import { buildPdfReport, pdfFileName } from '@/lib/export/pdf'
 import {
   buildSummaryLines,
@@ -17,6 +20,8 @@ import {
 } from '@/lib/export/reportBuilders'
 import { exportElementAsPng, pngFileName } from '@/lib/export/png'
 import { getAppSettings } from '@/db/repositories/settings'
+
+const DEFAULT_TASK_PREVIEW_COUNT = 3
 
 export function Dashboard() {
   const {
@@ -31,8 +36,18 @@ export function Dashboard() {
     expenseCategoryTotals,
     commodityTotals,
   } = useYearSummary()
+  const { currentYearId } = useYearContext()
+  const tasks = useTasks(currentYearId)
+  const appSettings = useAppSettings()
   const { showToast } = useToast()
   const reportRef = useRef<HTMLDivElement>(null)
+
+  const taskPreviewCount = appSettings?.dashboardTaskPreviewCount ?? DEFAULT_TASK_PREVIEW_COUNT
+  const upcomingTasks = useMemo(() => {
+    if (!tasks) return []
+    const pending = tasks.filter((t) => !t.done)
+    return sortByKey(pending, 'dueDate', 'asc').slice(0, taskPreviewCount)
+  }, [tasks, taskPreviewCount])
 
   if (loading || !currentYear || !summary) {
     return <p className="page-loading">Loading dashboard…</p>
@@ -138,6 +153,31 @@ export function Dashboard() {
         <h2 id="actual-heading" className="section-title">
           Actual (Cash in Hand)
         </h2>
+        <div className={`balance-banner ${summary.closingBalance >= 0 ? 'balance-banner--positive' : 'balance-banner--negative'}`}>
+          <div>
+            <div className="balance-banner__label">Closing Balance</div>
+            <div className="balance-banner__hint">Opening {formatCurrency(summary.openingBalance)} + Donations {formatCurrency(summary.totalMonetaryDonations)} − Expenses {formatCurrency(summary.totalExpenses)}</div>
+          </div>
+          <div className="balance-banner__value">{formatCurrency(summary.closingBalance)}</div>
+        </div>
+
+        {taskPreviewCount > 0 && upcomingTasks.length > 0 && (
+          <div className="heads-up">
+            <div className="heads-up__title">📝 Heads Up — Upcoming Tasks</div>
+            <ul className="heads-up__list">
+              {upcomingTasks.map((t) => (
+                <li key={t.id} className="heads-up__item">
+                  <span className="heads-up__item-title">{t.title}</span>
+                  <span className="heads-up__item-date">Due {formatDisplayDate(t.dueDate)}</span>
+                </li>
+              ))}
+            </ul>
+            <Link className="heads-up__link" to="/tasks">
+              View all tasks →
+            </Link>
+          </div>
+        )}
+
         <div className="stat-grid">
           <StatCard label="Opening Balance" value={formatCurrency(summary.openingBalance)} />
           <StatCard
@@ -158,7 +198,6 @@ export function Dashboard() {
             hint={`${summary.counts.expenses} entr(y/ies)`}
             tone="negative"
           />
-          <StatCard label="Closing Balance" value={formatCurrency(summary.closingBalance)} tone="default" />
         </div>
       </section>
 

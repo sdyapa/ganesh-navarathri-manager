@@ -141,6 +141,12 @@ export const driveReminderIntervalSchema = z
   .min(1, 'Must be at least 1 day')
   .max(365, 'Must be 365 days or fewer')
 
+export const dashboardTaskPreviewCountSchema = z
+  .number({ invalid_type_error: 'Enter a number' })
+  .int('Enter a whole number')
+  .min(0, 'Must be 0 or more (0 hides the Heads Up section)')
+  .max(20, 'Must be 20 or fewer')
+
 // Kept short deliberately — this renders in the sidebar and a mobile top bar alongside the
 // year switcher, so an overly long name defeats the point of making it customizable.
 export const displayNameSchema = z
@@ -346,6 +352,7 @@ export const backupFileSchema = z
               .optional(),
             actionDisplayMode: z.enum(['icon', 'text', 'both']).optional(),
             themePreference: z.enum(['system', 'light', 'dark']).optional(),
+            dashboardTaskPreviewCount: z.number().optional(),
             updatedAt: z.string().optional(),
           })
           .passthrough()

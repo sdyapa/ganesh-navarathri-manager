@@ -2,6 +2,7 @@ import { db } from '@/db/db'
 import { nowIso } from '@/lib/date'
 import {
   DEFAULT_ACTION_DISPLAY_MODE,
+  DEFAULT_DASHBOARD_TASK_PREVIEW_COUNT,
   DEFAULT_DISPLAY_NAME,
   DEFAULT_THEME_PREFERENCE,
   buildDefaultDriveBackupReminder,
@@ -20,6 +21,7 @@ export function withAppSettingsDefaults(settings: AppSettings): AppSettings {
     whatsappTemplates: settings.whatsappTemplates ?? buildDefaultWhatsAppTemplates(),
     actionDisplayMode: settings.actionDisplayMode ?? DEFAULT_ACTION_DISPLAY_MODE,
     themePreference: settings.themePreference ?? DEFAULT_THEME_PREFERENCE,
+    dashboardTaskPreviewCount: settings.dashboardTaskPreviewCount ?? DEFAULT_DASHBOARD_TASK_PREVIEW_COUNT,
     driveBackupReminder: settings.driveBackupReminder ?? buildDefaultDriveBackupReminder(),
   }
 }
@@ -33,6 +35,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     whatsappTemplates: buildDefaultWhatsAppTemplates(),
     actionDisplayMode: DEFAULT_ACTION_DISPLAY_MODE,
     themePreference: DEFAULT_THEME_PREFERENCE,
+    dashboardTaskPreviewCount: DEFAULT_DASHBOARD_TASK_PREVIEW_COUNT,
     driveBackupReminder: buildDefaultDriveBackupReminder(),
     updatedAt: nowIso(),
   }
@@ -53,6 +56,11 @@ export async function updateActionDisplayMode(mode: ActionDisplayMode): Promise<
 export async function updateThemePreference(preference: ThemePreference): Promise<void> {
   const current = await getAppSettings()
   await db.appSettings.put({ ...current, themePreference: preference, updatedAt: nowIso() })
+}
+
+export async function updateDashboardTaskPreviewCount(count: number): Promise<void> {
+  const current = await getAppSettings()
+  await db.appSettings.put({ ...current, dashboardTaskPreviewCount: count, updatedAt: nowIso() })
 }
 
 export async function updateWhatsAppTemplates(templates: WhatsAppTemplates): Promise<void> {

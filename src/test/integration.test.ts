@@ -41,6 +41,7 @@ import {
   getAppSettings,
   recordDriveBackupCompleted,
   updateActionDisplayMode,
+  updateDashboardTaskPreviewCount,
   updateDisplayName,
   updateDriveReminderIntervalDays,
   updateThemePreference,
@@ -890,33 +891,39 @@ describe('customizable display name', () => {
   })
 })
 
-describe('appearance settings (action display mode + theme)', () => {
-  it('defaults to text-only actions and the system theme', async () => {
+describe('appearance settings (action display mode + theme + dashboard task preview count)', () => {
+  it('defaults to text-only actions, the system theme, and a preview count of 3', async () => {
     const settings = await getAppSettings()
     expect(settings.actionDisplayMode).toBe('text')
     expect(settings.themePreference).toBe('system')
+    expect(settings.dashboardTaskPreviewCount).toBe(3)
   })
 
   it('updates independently of other settings', async () => {
     await updateDriveReminderIntervalDays(5)
     await updateActionDisplayMode('icon')
     await updateThemePreference('dark')
+    await updateDashboardTaskPreviewCount(5)
 
     const settings = await getAppSettings()
     expect(settings.actionDisplayMode).toBe('icon')
     expect(settings.themePreference).toBe('dark')
-    expect(settings.driveBackupReminder.intervalDays).toBe(5) // unaffected by either change
+    expect(settings.dashboardTaskPreviewCount).toBe(5)
+    expect(settings.driveBackupReminder.intervalDays).toBe(5) // unaffected by the other changes
   })
 
   it('is included in an exported backup and restored by a full "replace-all" import', async () => {
     await updateActionDisplayMode('both')
     await updateThemePreference('light')
+    await updateDashboardTaskPreviewCount(7)
     const backup = await exportFullBackup()
     expect(backup.settings.appSettings.actionDisplayMode).toBe('both')
     expect(backup.settings.appSettings.themePreference).toBe('light')
+    expect(backup.settings.appSettings.dashboardTaskPreviewCount).toBe(7)
 
     await updateActionDisplayMode('text') // simulate a different device's current settings
     await updateThemePreference('system')
+    await updateDashboardTaskPreviewCount(3)
     const inspection = await inspectBackupFile(backup)
     if (!inspection.valid) throw new Error('expected valid backup')
     await applyBackupImport(inspection.backup, 'replace-all')
@@ -924,17 +931,21 @@ describe('appearance settings (action display mode + theme)', () => {
     const restored = await getAppSettings()
     expect(restored.actionDisplayMode).toBe('both')
     expect(restored.themePreference).toBe('light')
+    expect(restored.dashboardTaskPreviewCount).toBe(7)
   })
 
   it('falls back to the current device values when restoring an older backup that predates these fields', async () => {
     await updateActionDisplayMode('icon')
     await updateThemePreference('dark')
+    await updateDashboardTaskPreviewCount(9)
     const backup = await exportFullBackup()
     // Simulate a pre-existing backup captured before these fields were introduced.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     delete (backup.settings.appSettings as any).actionDisplayMode
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     delete (backup.settings.appSettings as any).themePreference
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    delete (backup.settings.appSettings as any).dashboardTaskPreviewCount
 
     const inspection = await inspectBackupFile(backup)
     if (!inspection.valid) throw new Error('expected valid backup')
@@ -943,6 +954,7 @@ describe('appearance settings (action display mode + theme)', () => {
     const restored = await getAppSettings()
     expect(restored.actionDisplayMode).toBe('icon')
     expect(restored.themePreference).toBe('dark')
+    expect(restored.dashboardTaskPreviewCount).toBe(9)
   })
 })
 
