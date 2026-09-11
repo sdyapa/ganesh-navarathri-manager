@@ -8,6 +8,7 @@ import { exportFullBackup, exportYearBackup, downloadJsonFile, backupFileName } 
 import { applyBackupImport, inspectBackupFile, type BackupInspection, type ImportMode } from '@/services/backupImport'
 import { getResetImpact, resetApplication } from '@/services/resetService'
 import { seedSampleData } from '@/services/sampleDataService'
+import { detectOwnRepo, fetchBackupFromGitHub, listGitHubBackupFiles, type GitHubBackupFile } from '@/lib/githubImport'
 
 export function DataManagement() {
   const { years, currentYear, setCurrentYearId } = useYearContext()
@@ -19,6 +20,15 @@ export function DataManagement() {
   const [importMode, setImportMode] = useState<ImportMode>('add-new')
   const [importBusy, setImportBusy] = useState(false)
   const [importError, setImportError] = useState<string | null>(null)
+  const [githubUrl, setGithubUrl] = useState('')
+  const [githubFetchBusy, setGithubFetchBusy] = useState(false)
+  const detectedRepo = useRef(detectOwnRepo()).current
+  const [githubOwner, setGithubOwner] = useState(detectedRepo?.owner ?? '')
+  const [githubRepo, setGithubRepo] = useState(detectedRepo?.repo ?? '')
+  const [githubBranch, setGithubBranch] = useState('master')
+  const [githubFiles, setGithubFiles] = useState<GitHubBackupFile[] | null>(null)
+  const [githubBrowseBusy, setGithubBrowseBusy] = useState(false)
+  const [githubBrowseError, setGithubBrowseError] = useState<string | null>(null)
 
   const [showSampleConfirm, setShowSampleConfirm] = useState(false)
   const [showResetConfirm, setShowResetConfirm] = useState(false)
@@ -45,20 +55,24 @@ export function DataManagement() {
     showToast('Full database exported')
   }
 
+  async function inspectAndStage(parsed: unknown) {
+    const result = await inspectBackupFile(parsed)
+    if (!result.valid) {
+      setImportError(result.error)
+      setInspection(null)
+    } else {
+      setImportError(null)
+      setInspection(result)
+      setImportMode('add-new')
+    }
+  }
+
   function handleFileChosen(file: File) {
     setImportError(null)
     const reader = new FileReader()
     reader.onload = async () => {
       try {
-        const parsed = JSON.parse(String(reader.result))
-        const result = await inspectBackupFile(parsed)
-        if (!result.valid) {
-          setImportError(result.error)
-          setInspection(null)
-        } else {
-          setInspection(result)
-          setImportMode('add-new')
-        }
+        await inspectAndStage(JSON.parse(String(reader.result)))
       } catch {
         setImportError('This file is not valid JSON and could not be read as a backup.')
         setInspection(null)
@@ -66,6 +80,55 @@ export function DataManagement() {
     }
     reader.onerror = () => setImportError('Could not read the selected file.')
     reader.readAsText(file)
+  }
+
+  async function handleImportFromGitHubUrl() {
+    if (!githubUrl.trim()) return
+    setImportError(null)
+    setGithubFetchBusy(true)
+    try {
+      const result = await fetchBackupFromGitHub(githubUrl)
+      if (!result.ok) {
+        setImportError(result.error)
+        setInspection(null)
+        return
+      }
+      await inspectAndStage(result.data)
+    } finally {
+      setGithubFetchBusy(false)
+    }
+  }
+
+  async function handleBrowseGitHub() {
+    if (!githubOwner.trim() || !githubRepo.trim()) return
+    setGithubBrowseError(null)
+    setGithubFiles(null)
+    setGithubBrowseBusy(true)
+    try {
+      const files = await listGitHubBackupFiles(githubOwner.trim(), githubRepo.trim(), githubBranch.trim() || 'master')
+      setGithubFiles(files)
+      if (files.length === 0) setGithubBrowseError('No .json files found under backups/ in that repo/branch.')
+    } catch (err) {
+      setGithubBrowseError(err instanceof Error ? err.message : 'Could not list files from GitHub.')
+    } finally {
+      setGithubBrowseBusy(false)
+    }
+  }
+
+  async function handleImportFromGitHubFile(file: GitHubBackupFile) {
+    setImportError(null)
+    setGithubFetchBusy(true)
+    try {
+      const result = await fetchBackupFromGitHub(file.downloadUrl)
+      if (!result.ok) {
+        setImportError(result.error)
+        setInspection(null)
+        return
+      }
+      await inspectAndStage(result.data)
+    } finally {
+      setGithubFetchBusy(false)
+    }
   }
 
   async function handleConfirmImport() {
@@ -168,11 +231,92 @@ export function DataManagement() {
           accept="application/json"
           onChange={(e) => e.target.files?.[0] && handleFileChosen(e.target.files[0])}
         />
+
         {importError && (
           <p className="form-field__error" role="alert">
             {importError}
           </p>
         )}
+      </div>
+
+      <div className="settings-subsection">
+        <h3>Import from GitHub</h3>
+        <p className="page__note">
+          Browse the backups already committed to a public GitHub repo (e.g. this app's own <code>backups/</code>
+          archive) and pick one to import — no need to download and re-upload it, which is especially handy on a
+          phone.
+        </p>
+        <div className="inline-form">
+          <input
+            type="text"
+            placeholder="owner"
+            value={githubOwner}
+            onChange={(e) => setGithubOwner(e.target.value)}
+            aria-label="GitHub owner"
+          />
+          <input
+            type="text"
+            placeholder="repo"
+            value={githubRepo}
+            onChange={(e) => setGithubRepo(e.target.value)}
+            aria-label="GitHub repository"
+          />
+          <input
+            type="text"
+            placeholder="branch"
+            value={githubBranch}
+            onChange={(e) => setGithubBranch(e.target.value)}
+            aria-label="Branch"
+          />
+          <button type="button" className="button button--secondary" onClick={handleBrowseGitHub} disabled={githubBrowseBusy || !githubOwner.trim() || !githubRepo.trim()}>
+            {githubBrowseBusy ? 'Loading…' : 'Browse backups/'}
+          </button>
+        </div>
+        {detectedRepo && (
+          <p className="page__note">
+            Detected this deployment's own repo (<code>{detectedRepo.owner}/{detectedRepo.repo}</code>) automatically
+            — change the fields above only to browse a different repo.
+          </p>
+        )}
+
+        {githubBrowseError && (
+          <p className="form-field__error" role="alert">
+            {githubBrowseError}
+          </p>
+        )}
+
+        {githubFiles && githubFiles.length > 0 && (
+          <ul className="manage-list">
+            {githubFiles.map((f) => (
+              <li key={f.path} className="manage-list__item">
+                <span className="manage-list__label">
+                  {f.path}
+                  <span className="text-muted"> — {(f.size / 1024).toFixed(1)} KB</span>
+                </span>
+                <button type="button" className="link-button" onClick={() => handleImportFromGitHubFile(f)} disabled={githubFetchBusy}>
+                  {githubFetchBusy ? 'Fetching…' : 'Import…'}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <details>
+          <summary>Or paste a direct file link instead</summary>
+          <div className="inline-form" style={{ marginTop: 'var(--space-2)' }}>
+            <input
+              type="url"
+              className="input--grow"
+              placeholder="https://github.com/<owner>/<repo>/blob/master/backups/2026/…json"
+              value={githubUrl}
+              onChange={(e) => setGithubUrl(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleImportFromGitHubUrl()}
+            />
+            <button type="button" className="button button--secondary" onClick={handleImportFromGitHubUrl} disabled={githubFetchBusy || !githubUrl.trim()}>
+              {githubFetchBusy ? 'Fetching…' : 'Fetch & Import'}
+            </button>
+          </div>
+        </details>
       </div>
 
       <div className="settings-subsection">
