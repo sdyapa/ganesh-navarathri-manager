@@ -423,8 +423,9 @@ Expected Expenses, Auctions, Tasks (with their checklists), Key Events, and Pooj
 entries. Cross-year settings (Categories, Units, People & Vendors) travel once per backup file,
 not per year. A few things are deliberately device-local and never included in a backup, since
 restoring someone else's data shouldn't overwrite them: the Google Drive backup reminder
-schedule/history, and (unless explicitly renamed) the app's customizable display name falls back
-to whatever this device already has if the backup predates that setting.
+schedule/history, the local backup on launch setting (§8.4) and the folder it's pointed at, and
+(unless explicitly renamed) the app's customizable display name falls back to whatever this
+device already has if the backup predates that setting.
 
 ### 8.2 Reverting an old backup schema
 
@@ -444,9 +445,31 @@ into that year's folder, and commit it — the committee's full financial histor
 the same place as the app's code, with `git log` as the audit trail of when each backup was
 taken.
 
+### 8.4 Local Backup on Launch
+
+Separately from the manual exports above, the app can save a **full-database backup
+automatically every time it opens** — no click required. Configure it from **Settings → Data
+Management → Local Backup on Launch**:
+
+- **On/off toggle**: enabled by default.
+- **Destination**: on a desktop browser that supports it (Chrome/Edge), click **Choose a
+  folder…** once to pick where backups should silently land — every future launch writes
+  straight into that folder with no repeated permission prompt. Everywhere else (Firefox,
+  Safari, and every mobile browser — none of which support picking a folder from a webpage),
+  backups always go to the ordinary Downloads folder instead, and the Settings page shows a note
+  explaining why no folder picker is offered there.
+- Because a fresh backup is written on every single launch, opening the app several times in one
+  day produces that many files — this is intentional, not a bug, matching how the feature was
+  requested.
+
+A backup that fails for any reason (permission revoked, the picked folder was moved or deleted,
+disk full) never blocks the app or shows an error — it's designed to be invisible when it works
+and harmless when it doesn't; the on-screen "Last automatic backup" timestamp is the only
+indicator either way.
+
 ## 9. Data Architecture
 
-A single IndexedDB database (Dexie schema version 4) holds every year. Records are scoped by
+A single IndexedDB database (Dexie schema version 5) holds every year. Records are scoped by
 `yearProfileId`, so switching years is just a query filter — not a restore operation. See
 `src/types/index.ts` for the full schema and `src/db/db.ts` for the Dexie table/index
 definitions and version-upgrade history.
@@ -456,7 +479,8 @@ definitions and version-upgrade history.
 `PoojaAssignment`.
 
 **Cross-year entities**: `YearProfile` itself, `Category`, `Unit`, `Profile` (the People &
-Vendors registry), `AppSettings`.
+Vendors registry), `AppSettings`, `LocalBackupHandleRecord` (the picked local-backup folder
+handle, kept separate from `AppSettings` — see §8.4).
 
 Financial rules enforced throughout the codebase (see `src/lib/calculations.ts`):
 

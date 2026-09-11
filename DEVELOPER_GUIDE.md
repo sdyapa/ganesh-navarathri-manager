@@ -38,11 +38,13 @@ hooks/ (useLiveQuery wrappers — reactive reads)         services/ (cross-cutti
   year carry-forward (`yearService.ts`), Expected↔Actual conversion including undo
   (`conversionService.ts`), copying Actual records into next year's Expected list
   (`copyForwardService.ts`), backup export/import (`backupExport.ts` / `backupImport.ts`),
-  full reset (`resetService.ts`), demo data (`sampleDataService.ts`).
+  the on-launch local backup (`localBackupService.ts`), full reset (`resetService.ts`), demo
+  data (`sampleDataService.ts`).
 - **`src/lib/`** — pure, dependency-free logic: the financial calculation engine
   (`calculations.ts`), zod validation schemas (`validation.ts`), date/currency formatting,
-  WhatsApp template rendering, PDF/PNG export builders, the Google Drive REST client, small
-  helpers (`id.ts`, `diff.ts`, `sanitize.ts`, `clipboard.ts`, `tableUtils.ts`).
+  WhatsApp template rendering, PDF/PNG export builders, the Google Drive REST client, the File
+  System Access API wrapper (`localBackup.ts`), small helpers (`id.ts`, `diff.ts`, `sanitize.ts`,
+  `clipboard.ts`, `tableUtils.ts`).
 - **`src/hooks/`** — `useYearData.ts` is a thin `useLiveQuery` wrapper per entity (reactive reads
   that auto-refresh on any write, anywhere); `useYearSummary.ts` composes several of those plus
   `calculations.ts` into the numbers the Dashboard/Reports need; the rest are small
@@ -543,6 +545,50 @@ confirming the row text is legible dark-on-white, not near-invisible):
 - `lib/export/png.ts`'s `exportElementAsPng` and `exportTableReportAsPng` both set
   `data-theme="light"` **and** an explicit `color` override on the captured element/container
   (see gotcha #3 above), restoring the original values in a `finally` block afterward.
+
+### 2.17 Local Backup on Launch
+
+| Layer | File(s) |
+|---|---|
+| Type | `LocalBackupSettings` on `AppSettings`, `LocalBackupHandleRecord` (internal to `db/`) in `types/index.ts` |
+| Dexie table | `localBackupHandle: 'id'` — a single row, `{ id: 'directory', handle: FileSystemDirectoryHandle }` (added in `db.ts` v5) |
+| Repository | `db/repositories/settings.ts` — `updateLocalBackupEnabled`, `recordLocalBackupCompleted`, `setLocalBackupDirectory`; `db/repositories/localBackupHandle.ts` — `save`/`get`/`clearLocalBackupDirectoryHandle` |
+| Lib | `lib/localBackup.ts` — `isDirectoryPickerSupported`, `writeBackupToDirectory`, `pickLocalBackupDirectory` (File System Access API wrappers, no db/ imports) |
+| Service | `services/localBackupService.ts` — `runLaunchBackup` (the on-launch orchestration), `chooseLocalBackupDirectory`, `switchLocalBackupToDownloads` |
+| Component | `components/layout/LaunchBackupRunner.tsx` (renders nothing, fires `runLaunchBackup` once), mounted in `AppLayout.tsx` |
+| Page | `pages/settings/DataManagement.tsx`'s "Local Backup on Launch" subsection |
+| Tests | `describe('local backup on launch settings')`, `describe('local backup directory handle storage (db v5)')` |
+
+**Why the directory handle isn't stored on `AppSettings`**: every other `AppSettings` field is
+JSON-serialized on every backup export (`backupExport.ts`'s `downloadJsonFile`) and imported
+field-by-field in `backupImport.ts`. A `FileSystemDirectoryHandle` is real IndexedDB-cloneable
+but has no business flowing through that JSON path, so it lives in its own tiny one-row table
+instead — `localBackupHandle.ts` is the only place that ever reads or writes it.
+
+**Per-device, not portable** — `localBackup` follows the exact same pattern as
+`driveBackupReminder` (§2.9's sibling concept): excluded from `buildSettingsBlock()`'s picked
+`appSettings` fields in `backupExport.ts`, and preserved as `currentSettings.localBackup` in
+`backupImport.ts`'s `replace-all` path rather than ever being overwritten by an imported backup.
+A picked folder handle and this device's own backup history aren't data to carry into a restore.
+
+**`isDirectoryPickerSupported()`** gates every bit of directory-picker UI and logic — it's `false`
+on Firefox, Safari, and every mobile browser (the File System Access API is desktop Chrome/Edge
+only), and the Settings page shows a plain explanatory note instead of a picker button in that
+case, so nothing on an unsupported browser dangles a control that would silently do nothing.
+
+**`runLaunchBackup()` never throws** — every failure mode (backup destination not configured,
+permission revoked since the folder was picked, the folder itself moved/deleted, disk full)
+degrades to either falling back to a Downloads-folder save (if the directory write failed) or
+doing nothing observable at all (if the whole operation errors) rather than surfacing to the
+user. This is deliberate: a background backup interrupting app boot with an error dialog would be
+worse than a silently skipped backup, especially since Settings' "Last automatic backup"
+timestamp already gives visibility into whether it's actually running.
+
+**`LaunchBackupRunner`'s `ranRef` guard** exists specifically because React 18 StrictMode
+double-invokes mount effects in development — without it, one `npm run dev` page load would
+write two backup files instead of one. It's a plain `useRef(false)` checked and flipped inside
+the effect, the same pattern used nowhere else in this codebase because no other on-mount effect
+here has an external side effect (a file write / download) worth guarding against a double-fire.
 
 ## 3. Cross-Cutting Systems
 
