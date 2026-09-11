@@ -40,12 +40,20 @@ import { applyBackupImport, inspectBackupFile } from '@/services/backupImport'
 import {
   getAppSettings,
   recordDriveBackupCompleted,
+  recordLocalBackupCompleted,
+  setLocalBackupDirectory,
   updateActionDisplayMode,
   updateDashboardTaskPreviewCount,
   updateDisplayName,
   updateDriveReminderIntervalDays,
+  updateLocalBackupEnabled,
   updateThemePreference,
 } from '@/db/repositories/settings'
+import {
+  saveLocalBackupDirectoryHandle,
+  getLocalBackupDirectoryHandle,
+  clearLocalBackupDirectoryHandle,
+} from '@/db/repositories/localBackupHandle'
 import { DEFAULT_DISPLAY_NAME } from '@/db/defaults'
 import { seedSampleData, YearHasRealDataError } from '@/services/sampleDataService'
 import { ensureAppInitialized } from '@/db/init'
@@ -985,6 +993,100 @@ describe('appearance settings (action display mode + theme + dashboard task prev
     expect(restored.actionDisplayMode).toBe('icon')
     expect(restored.themePreference).toBe('dark')
     expect(restored.dashboardTaskPreviewCount).toBe(9)
+  })
+})
+
+describe('local backup on launch settings', () => {
+  it('defaults to enabled, saving to Downloads, with no backup recorded yet', async () => {
+    const settings = await getAppSettings()
+    expect(settings.localBackup).toEqual({
+      enabled: true,
+      destination: 'downloads',
+      directoryName: null,
+      lastLocalBackupAt: null,
+    })
+  })
+
+  it('backfills a missing localBackup field for a settings document created before this feature existed', async () => {
+    // Simulate an old settings doc, same technique as the other withAppSettingsDefaults tests
+    // in this file — Dexie never enforces a stored document's shape.
+    const current = await getAppSettings()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const legacy: any = { ...current }
+    delete legacy.localBackup
+    await db.appSettings.put(legacy)
+
+    const backfilled = await getAppSettings()
+    expect(backfilled.localBackup).toEqual({
+      enabled: true,
+      destination: 'downloads',
+      directoryName: null,
+      lastLocalBackupAt: null,
+    })
+  })
+
+  it('toggling enabled, recording a completed backup, and setting/clearing a directory all update independently of other settings', async () => {
+    await updateDriveReminderIntervalDays(5)
+    await updateLocalBackupEnabled(false)
+    let settings = await getAppSettings()
+    expect(settings.localBackup.enabled).toBe(false)
+    expect(settings.driveBackupReminder.intervalDays).toBe(5) // unaffected
+
+    await updateLocalBackupEnabled(true)
+    await setLocalBackupDirectory('Backups')
+    settings = await getAppSettings()
+    expect(settings.localBackup.enabled).toBe(true)
+    expect(settings.localBackup.destination).toBe('directory')
+    expect(settings.localBackup.directoryName).toBe('Backups')
+    expect(settings.localBackup.lastLocalBackupAt).toBeNull()
+
+    await recordLocalBackupCompleted()
+    settings = await getAppSettings()
+    expect(settings.localBackup.lastLocalBackupAt).not.toBeNull()
+    expect(settings.localBackup.directoryName).toBe('Backups') // unaffected by recording a backup
+
+    await setLocalBackupDirectory(null)
+    settings = await getAppSettings()
+    expect(settings.localBackup.destination).toBe('downloads')
+    expect(settings.localBackup.directoryName).toBeNull()
+  })
+
+  it('is never included in an exported backup file', async () => {
+    await setLocalBackupDirectory('Backups')
+    const backup = await exportFullBackup()
+    expect(backup.settings.appSettings).not.toHaveProperty('localBackup')
+  })
+
+  it('is preserved (not wiped) by a full-database "replace-all" import, since it is a per-device fact', async () => {
+    await setLocalBackupDirectory('My Backups Folder')
+    await recordLocalBackupCompleted()
+    const before = (await getAppSettings()).localBackup
+
+    const backup = await exportFullBackup()
+    const inspection = await inspectBackupFile(backup)
+    if (!inspection.valid) throw new Error('expected valid backup')
+    await applyBackupImport(inspection.backup, 'replace-all')
+
+    const after = await getAppSettings()
+    expect(after.localBackup).toEqual(before)
+  })
+})
+
+describe('local backup directory handle storage (db v5)', () => {
+  it('saves, reads back, and clears a directory handle independently of appSettings', async () => {
+    expect(await getLocalBackupDirectoryHandle()).toBeUndefined()
+
+    // A real FileSystemDirectoryHandle only exists in a browser; this just exercises the
+    // repository's put/get/delete plumbing against the new v5 table, not the real File System
+    // Access API (that's covered by the live-browser verification pass instead).
+    const fakeHandle = { kind: 'directory', name: 'Backups' } as unknown as FileSystemDirectoryHandle
+    await saveLocalBackupDirectoryHandle(fakeHandle)
+
+    const stored = await getLocalBackupDirectoryHandle()
+    expect(stored?.name).toBe('Backups')
+
+    await clearLocalBackupDirectoryHandle()
+    expect(await getLocalBackupDirectoryHandle()).toBeUndefined()
   })
 })
 
