@@ -14,7 +14,7 @@ import { listTasksForYear } from '@/db/repositories/tasks'
 import { listKeyEventsForYear } from '@/db/repositories/keyEvents'
 import { listPoojaAssignmentsForYear } from '@/db/repositories/poojaAssignments'
 import { getAppSettings } from '@/db/repositories/settings'
-import { nowIso } from '@/lib/date'
+import { nowIso, formatFileTimestamp } from '@/lib/date'
 
 async function buildYearBundle(yearProfileId: string): Promise<YearProfileBundle> {
   const profile = await getYearProfile(yearProfileId)
@@ -48,6 +48,7 @@ async function buildSettingsBlock() {
       whatsappTemplates: appSettings.whatsappTemplates,
       actionDisplayMode: appSettings.actionDisplayMode,
       themePreference: appSettings.themePreference,
+      dashboardTaskPreviewCount: appSettings.dashboardTaskPreviewCount,
       updatedAt: appSettings.updatedAt,
     },
   }
@@ -80,8 +81,11 @@ export async function exportFullBackup(): Promise<BackupFile> {
   }
 }
 
+/** Includes the time (not just the date) so exporting more than once in the same day — e.g.
+ *  once mid-season, again after immersion — produces a distinct file each time instead of
+ *  silently colliding on name. */
 export function backupFileName(backup: BackupFile): string {
-  const stamp = backup.exportedAt.slice(0, 10)
+  const stamp = formatFileTimestamp(backup.exportedAt)
   if (backup.exportType === 'single-year' && backup.years.length === 1) {
     return `ganesh-navarathri-${backup.years[0].profile.year}-backup-${stamp}.json`
   }

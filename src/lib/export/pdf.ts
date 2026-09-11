@@ -6,7 +6,7 @@
 // jsPDF/jspdf-autotable are dynamically imported (not top-level) so they land in their own
 // chunk and never bloat the initial page load — most visits never export a PDF at all (spec
 // "Performance": lazy-load reports/exports where appropriate).
-import { formatDisplayDate, formatTimestamp } from '@/lib/date'
+import { formatFileTimestamp, formatTimestamp } from '@/lib/date'
 import { needsRasterRendering, rasterizeText } from './pdfUnicodeText'
 import { APP_NAME } from '@/types'
 import type jsPDF from 'jspdf'
@@ -152,5 +152,5 @@ export async function buildPdfReport(options: PdfReportOptions): Promise<jsPDF> 
 
 export function pdfFileName(yearName: string, reportTitle: string): string {
   const safe = `${yearName}-${reportTitle}`.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-  return `${safe}-${formatDisplayDate(new Date().toISOString().slice(0, 10)).toLowerCase()}.pdf`
+  return `${safe}-${formatFileTimestamp(new Date().toISOString())}.pdf`
 }

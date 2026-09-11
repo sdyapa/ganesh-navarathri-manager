@@ -75,6 +75,22 @@ export function isDateInRange(date: string, from?: string, to?: string): boolean
   return true
 }
 
+/** "2026-09-11-1743" — local date + 24h time, filename-safe (no colons/spaces). Used for
+ *  exported file names (backups, PDF/PNG reports) so exporting more than once in the same day
+ *  produces a distinct file each time instead of relying on the browser to silently append
+ *  "(1)", "(2)", etc. `iso` is a full timestamp (has an explicit time/offset), not a date-only
+ *  string, so parsing it with `new Date()` is safe here — unlike the "YYYY-MM-DD" pitfall this
+ *  file's other helpers guard against. */
+export function formatFileTimestamp(iso: string): string {
+  const d = new Date(iso)
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const hh = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}-${hh}${min}`
+}
+
 export function formatTimestamp(iso: string): string {
   try {
     const d = new Date(iso)

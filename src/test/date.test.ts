@@ -3,6 +3,7 @@ import {
   compareDateOnly,
   daysBetweenTimestamps,
   formatDisplayDate,
+  formatFileTimestamp,
   fromLocalParts,
   isDateInRange,
   isValidDateOnly,
@@ -57,5 +58,18 @@ describe('date-only handling (timezone safety)', () => {
     expect(daysBetweenTimestamps('2026-08-20T10:00:00.000Z', '2026-08-27T10:00:00.000Z')).toBe(7)
     expect(daysBetweenTimestamps('2026-08-20T10:00:00.000Z', '2026-08-20T18:00:00.000Z')).toBe(0)
     expect(daysBetweenTimestamps('2026-08-20T10:00:00.000Z', '2026-08-20T10:00:00.000Z')).toBe(0)
+  })
+
+  it('formatFileTimestamp produces a filename-safe, zero-padded local date+time with no separators GitHub/OS filenames dislike', () => {
+    const d = new Date(2026, 8, 11, 7, 5) // 11-Sep-2026, 07:05 local — month is 0-indexed
+    const stamp = formatFileTimestamp(d.toISOString())
+    expect(stamp).toMatch(/^\d{4}-\d{2}-\d{2}-\d{4}$/)
+    expect(stamp).not.toContain(':')
+  })
+
+  it('formatFileTimestamp produces a distinct value for two exports made minutes apart on the same day', () => {
+    const first = formatFileTimestamp(new Date(2026, 8, 11, 9, 0).toISOString())
+    const second = formatFileTimestamp(new Date(2026, 8, 11, 9, 30).toISOString())
+    expect(first).not.toBe(second)
   })
 })

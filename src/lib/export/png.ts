@@ -1,6 +1,6 @@
 // PNG export via html2canvas. html2canvas is dynamically imported so it never bloats the
 // initial page load (spec "Performance": lazy-load reports/exports where appropriate).
-import { formatTimestamp } from '@/lib/date'
+import { formatFileTimestamp, formatTimestamp } from '@/lib/date'
 import type { PdfTableSpec } from './pdf'
 
 export interface PngReportMeta {
@@ -201,5 +201,5 @@ export async function exportTableReportAsPng(filename: string, options: PngTable
 
 export function pngFileName(yearName: string, reportTitle: string): string {
   const safe = `${yearName}-${reportTitle}`.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-  return `${safe}.png`
+  return `${safe}-${formatFileTimestamp(new Date().toISOString())}.png`
 }
