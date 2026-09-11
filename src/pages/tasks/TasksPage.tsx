@@ -8,6 +8,7 @@ import { FilterBar, SelectFilter, SortControl } from '@/components/common/Filter
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { SummaryList } from '@/components/common/SummaryList'
 import { ActionButton } from '@/components/common/ActionButton'
+import { CopyToYearModal, NEXT_YEAR_VALUE } from '@/components/common/CopyToYearModal'
 import { TaskForm, defaultTaskFormValues, taskToFormValues } from './TaskForm'
 import {
   insertTask,
@@ -18,13 +19,16 @@ import {
   toggleChecklistItem,
   removeChecklistItem,
 } from '@/db/repositories/tasks'
+import { copyTasksToYear } from '@/services/copyForwardService'
+import { getOrCreateNextYearProfile } from '@/services/yearService'
 import { formatDisplayDate } from '@/lib/date'
 import { sortByKey, type SortDirection } from '@/lib/tableUtils'
+import { pluralize } from '@/lib/pluralize'
 import { EDIT_ICON, DELETE_ICON, DONE_ICON, UNDO_DONE_ICON } from '@/lib/actionIcons'
 import type { TaskInput } from '@/lib/validation'
 import type { Task } from '@/types'
 
-type ModalState = { mode: 'closed' } | { mode: 'add' } | { mode: 'edit'; task: Task }
+type ModalState = { mode: 'closed' } | { mode: 'add' } | { mode: 'edit'; task: Task } | { mode: 'copy' }
 
 const SORT_OPTIONS = [
   { value: 'dueDate-asc', label: 'Due Date (Soonest first)' },
@@ -33,7 +37,7 @@ const SORT_OPTIONS = [
 ]
 
 export function TasksPage() {
-  const { currentYearId } = useYearContext()
+  const { currentYearId, currentYear, years } = useYearContext()
   const tasks = useTasks(currentYearId)
   const { showToast } = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -44,6 +48,7 @@ export function TasksPage() {
   const [statusFilter, setStatusFilter] = useState('pending')
   const [sortOption, setSortOption] = useState('dueDate-asc')
   const [checklistDrafts, setChecklistDrafts] = useState<Record<string, string>>({})
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
   const filtered = useMemo(() => {
     if (!tasks) return []
@@ -93,6 +98,40 @@ export function TasksPage() {
     setChecklistDrafts((prev) => ({ ...prev, [taskId]: '' }))
   }
 
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  async function handleCopyToYear(targetYearSelection: string) {
+    if (!currentYearId || !currentYear) return
+    setBusy(true)
+    try {
+      const { targetYearId, targetYearName, targetYearNumber } =
+        targetYearSelection === NEXT_YEAR_VALUE
+          ? await getOrCreateNextYearProfile(currentYearId).then((r) => ({
+              targetYearId: r.profile.id,
+              targetYearName: r.profile.name,
+              targetYearNumber: r.profile.year,
+            }))
+          : {
+              targetYearId: targetYearSelection,
+              targetYearName: years.find((y) => y.id === targetYearSelection)?.name ?? 'target year',
+              targetYearNumber: years.find((y) => y.id === targetYearSelection)?.year ?? currentYear.year + 1,
+            }
+      const count = await copyTasksToYear([...selectedIds], targetYearId, currentYear.year, targetYearNumber)
+      setSelectedIds(new Set())
+      setModal({ mode: 'closed' })
+      showToast(`Copied ${pluralize(count, 'task')} to ${targetYearName}`)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="page">
       <div className="page__header">
@@ -130,12 +169,24 @@ export function TasksPage() {
             <SortControl value={sortOption} onChange={setSortOption} options={SORT_OPTIONS} />
           </FilterBar>
 
+          {selectedIds.size > 0 && (
+            <div className="row-actions">
+              <button type="button" className="button button--secondary" onClick={() => setModal({ mode: 'copy' })}>
+                Copy {pluralize(selectedIds.size, 'task')} to Next Year
+              </button>
+            </div>
+          )}
+
           {filtered.length === 0 ? (
             <EmptyState title="No matching tasks" description="Try adjusting your filters." />
           ) : (
             <div className="card-list">
               {filtered.map((t) => (
                 <div key={t.id} className="record-card">
+                  <label className="record-card__select">
+                    <input type="checkbox" checked={selectedIds.has(t.id)} onChange={() => toggleSelected(t.id)} />
+                    Select
+                  </label>
                   <div className="record-card__top">
                     <strong>{t.title}</strong>
                     {t.done ? <span className="badge badge--success">Done</span> : <span className="badge">Pending</span>}
@@ -206,6 +257,19 @@ export function TasksPage() {
           submitLabel="Save Changes"
           initialValues={taskToFormValues(modal.task)}
           onSubmit={(input) => handleEdit(modal.task, input)}
+          onClose={() => setModal({ mode: 'closed' })}
+        />
+      )}
+
+      {modal.mode === 'copy' && currentYear && (
+        <CopyToYearModal
+          title="Copy Tasks to Another Year"
+          itemLabel={pluralize(selectedIds.size, 'task')}
+          description={`This copies ${pluralize(selectedIds.size, 'task')} into the target year as fresh, unchecked to-dos (any checklist items are copied too, unchecked) — the due date shifts by the same number of years so it lands on the equivalent festival day.`}
+          sourceYear={currentYear}
+          years={years}
+          busy={busy}
+          onConfirm={handleCopyToYear}
           onClose={() => setModal({ mode: 'closed' })}
         />
       )}

@@ -44,6 +44,19 @@ export function fromLocalParts(year: number, month: number, day: number): string
   return `${year}-${mm}-${dd}`
 }
 
+/** Shifts a date-only string by whole years, preserving month/day — e.g. "2026-09-20" + 1 ->
+ *  "2027-09-20". Used by Task copy-forward (copyForwardService.ts) so a task's due date lands
+ *  on the same festival day next year rather than defaulting to today's date, which wouldn't
+ *  make sense for a date-driven reminder the way it does for a donation/expense amount. Falls
+ *  back to the 28th for a Feb 29 source date landing on a non-leap year, same as native `Date`
+ *  arithmetic would via overflow, but explicit here rather than silently rolling into March. */
+export function addYears(dateOnly: string, years: number): string {
+  const { year, month, day } = parseParts(dateOnly)
+  const targetYear = year + years
+  const daysInTargetMonth = new Date(targetYear, month, 0).getDate()
+  return fromLocalParts(targetYear, month, Math.min(day, daysInTargetMonth))
+}
+
 /** Builds a local-timezone Date for display/comparison purposes only — never serialize this back. */
 export function toLocalDate(dateOnly: string): Date {
   const { year, month, day } = parseParts(dateOnly)

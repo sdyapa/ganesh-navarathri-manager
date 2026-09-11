@@ -34,7 +34,7 @@ import {
 } from '@/db/repositories/categories'
 import { listUnits, setUnitActive, deleteUnit, isUnitInUse, restoreDefaultUnits } from '@/db/repositories/units'
 import { listProfiles, renameProfile, reorderProfiles, deleteProfile } from '@/db/repositories/profiles'
-import { copyExpensesToExpected, copyDonationsToExpected } from '@/services/copyForwardService'
+import { copyExpensesToExpected, copyDonationsToExpected, copyTasksToYear } from '@/services/copyForwardService'
 import { exportYearBackup, exportFullBackup } from '@/services/backupExport'
 import { applyBackupImport, inspectBackupFile } from '@/services/backupImport'
 import {
@@ -703,6 +703,36 @@ describe('copy Actual records forward to Expected (recurring items)', () => {
     expect(copiedCommodity.commodityName).toBe('Rice')
     expect(copiedCommodity.quantity).toBe(25)
     expect(targetExpected.every((d) => d.status === 'pending')).toBe(true)
+  })
+
+  it('copies selected tasks into a target year as fresh unchecked to-dos, shifting the due date by the year gap and leaving the source untouched', async () => {
+    const sourceYear = await createYearProfile({ year: 3120, name: 'GN 3120', carryForward: false })
+    const targetYear = await createYearProfile({ year: 3122, name: 'GN 3122', carryForward: false })
+    const task = await insertTask(sourceYear.id, {
+      title: 'Buy pooja items',
+      dueDate: '3120-08-10',
+      notes: 'Ask Sharma Ji',
+      checklistItems: ['Flowers', 'Coconuts'],
+    })
+    await toggleChecklistItem(task.id, task.checklist[0].id)
+
+    const count = await copyTasksToYear([task.id], targetYear.id, sourceYear.year, targetYear.year)
+    expect(count).toBe(1)
+
+    const targetTasks = await listTasksForYear(targetYear.id)
+    expect(targetTasks).toHaveLength(1)
+    expect(targetTasks[0].title).toBe('Buy pooja items')
+    expect(targetTasks[0].dueDate).toBe('3122-08-10')
+    expect(targetTasks[0].notes).toBe('Ask Sharma Ji')
+    expect(targetTasks[0].done).toBe(false)
+    expect(targetTasks[0].checklist).toHaveLength(2)
+    expect(targetTasks[0].checklist.every((i) => !i.done)).toBe(true)
+
+    // Source task is untouched, including the checked-off checklist item.
+    const sourceTasks = await listTasksForYear(sourceYear.id)
+    expect(sourceTasks).toHaveLength(1)
+    expect(sourceTasks[0].dueDate).toBe('3120-08-10')
+    expect(sourceTasks[0].checklist.find((i) => i.label === 'Flowers')?.done).toBe(true)
   })
 })
 

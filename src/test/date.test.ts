@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  addYears,
   compareDateOnly,
   daysBetweenTimestamps,
   formatDisplayDate,
@@ -71,5 +72,20 @@ describe('date-only handling (timezone safety)', () => {
     const first = formatFileTimestamp(new Date(2026, 8, 11, 9, 0).toISOString())
     const second = formatFileTimestamp(new Date(2026, 8, 11, 9, 30).toISOString())
     expect(first).not.toBe(second)
+  })
+
+  it('addYears shifts the year while preserving month and day', () => {
+    expect(addYears('2026-09-20', 1)).toBe('2027-09-20')
+    expect(addYears('2026-01-05', 3)).toBe('2029-01-05')
+  })
+
+  it('addYears clamps Feb 29 to Feb 28 when the target year is not a leap year', () => {
+    expect(addYears('2024-02-29', 1)).toBe('2025-02-28')
+    expect(addYears('2024-02-29', 4)).toBe('2028-02-29') // 2028 is also a leap year
+  })
+
+  it('addYears supports a zero shift (no-op) and negative shifts', () => {
+    expect(addYears('2026-09-20', 0)).toBe('2026-09-20')
+    expect(addYears('2027-09-20', -1)).toBe('2026-09-20')
   })
 })

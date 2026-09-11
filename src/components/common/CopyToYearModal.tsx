@@ -7,8 +7,11 @@ const NEXT_YEAR_VALUE = '__next__'
 
 interface CopyToYearModalProps {
   title: string
-  /** e.g. "5 expense(s)" — shown in the body copy. */
+  /** e.g. "5 expenses" — shown in the body copy. */
   itemLabel: string
+  /** Overrides the default "...as pending Expected records..." body copy — used by callers
+   *  (e.g. Tasks) where that wording doesn't apply. */
+  description?: string
   sourceYear: YearProfile
   years: YearProfile[]
   busy: boolean
@@ -17,11 +20,12 @@ interface CopyToYearModalProps {
   onClose: () => void
 }
 
-/** Target-year picker shared by the "copy to Expected" actions on Donations/Expenses — pins a
- *  "Next Year" option first (auto-created if it doesn't exist yet, mirroring the same pattern
- *  already used for auction-pledge conversion), and otherwise lists any other existing year so
- *  the user can target something further out if they've already created it. */
-export function CopyToYearModal({ title, itemLabel, sourceYear, years, busy, onConfirm, onClose }: CopyToYearModalProps) {
+/** Target-year picker shared by every "copy forward" action (Donations/Expenses to Expected,
+ *  Tasks to a fresh to-do list) — pins a "Next Year" option first (auto-created if it doesn't
+ *  exist yet, mirroring the same pattern already used for auction-pledge conversion), and
+ *  otherwise lists any other existing year so the user can target something further out if
+ *  they've already created it. */
+export function CopyToYearModal({ title, itemLabel, description, sourceYear, years, busy, onConfirm, onClose }: CopyToYearModalProps) {
   const nextYearNumber = sourceYear.year + 1
   const existingNextYear = years.find((y) => y.year === nextYearNumber)
   const otherYears = years.filter((y) => y.id !== sourceYear.id && y.id !== existingNextYear?.id).sort((a, b) => a.year - b.year)
@@ -44,8 +48,8 @@ export function CopyToYearModal({ title, itemLabel, sourceYear, years, busy, onC
       }
     >
       <p className="page__note">
-        This creates {itemLabel} as pending Expected records in the target year, using today's amounts as a starting
-        point — you can adjust them there once the real figure is known.
+        {description ??
+          `This creates ${itemLabel} as pending Expected records in the target year, using today's amounts as a starting point — you can adjust them there once the real figure is known.`}
       </p>
       <FormField label="Target Year" htmlFor="copy-target-year" required>
         <select id="copy-target-year" value={targetYearSelection} onChange={(e) => setTargetYearSelection(e.target.value)}>

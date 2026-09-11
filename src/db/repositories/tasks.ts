@@ -8,6 +8,10 @@ export async function listTasksForYear(yearProfileId: string): Promise<Task[]> {
   return db.tasks.where('yearProfileId').equals(yearProfileId).toArray()
 }
 
+export async function getTask(id: string): Promise<Task | undefined> {
+  return db.tasks.get(id)
+}
+
 export async function insertTask(yearProfileId: string, input: TaskInput): Promise<Task> {
   const now = nowIso()
   const task: Task = {
