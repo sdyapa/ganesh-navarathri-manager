@@ -1,20 +1,27 @@
 import { useRef, useState } from 'react'
 import { useYearContext } from '@/context/YearContext'
 import { useToast } from '@/context/ToastContext'
+import { useAppSettings } from '@/hooks/useYearData'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { Modal } from '@/components/common/Modal'
 import { SummaryList } from '@/components/common/SummaryList'
 import { exportFullBackup, exportYearBackup, downloadJsonFile, backupFileName } from '@/services/backupExport'
 import { applyBackupImport, inspectBackupFile, type BackupInspection, type ImportMode } from '@/services/backupImport'
+import { chooseLocalBackupDirectory, switchLocalBackupToDownloads } from '@/services/localBackupService'
 import { getResetImpact, resetApplication } from '@/services/resetService'
 import { seedSampleData } from '@/services/sampleDataService'
 import { detectOwnRepo, fetchBackupFromGitHub, listGitHubBackupFiles, type GitHubBackupFile } from '@/lib/githubImport'
+import { isDirectoryPickerSupported } from '@/lib/localBackup'
+import { updateLocalBackupEnabled } from '@/db/repositories/settings'
+import { formatTimestamp } from '@/lib/date'
 import { pluralize } from '@/lib/pluralize'
 
 export function DataManagement() {
   const { years, currentYear, setCurrentYearId } = useYearContext()
   const { showToast } = useToast()
+  const appSettings = useAppSettings()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [localBackupBusy, setLocalBackupBusy] = useState(false)
 
   const [specificYearId, setSpecificYearId] = useState(currentYear?.id ?? '')
   const [inspection, setInspection] = useState<BackupInspection | null>(null)
@@ -54,6 +61,31 @@ export function DataManagement() {
     const backup = await exportFullBackup()
     downloadJsonFile(backup, backupFileName(backup))
     showToast('Full database exported')
+  }
+
+  async function handleToggleLocalBackup(enabled: boolean) {
+    await updateLocalBackupEnabled(enabled)
+    showToast(enabled ? 'Automatic backup on launch enabled' : 'Automatic backup on launch disabled', 'info')
+  }
+
+  async function handleChooseLocalBackupDirectory() {
+    setLocalBackupBusy(true)
+    try {
+      const name = await chooseLocalBackupDirectory()
+      if (name) showToast(`Backups will now save to "${name}"`)
+    } finally {
+      setLocalBackupBusy(false)
+    }
+  }
+
+  async function handleUseDownloadsForLocalBackup() {
+    setLocalBackupBusy(true)
+    try {
+      await switchLocalBackupToDownloads()
+      showToast('Backups will now save to your Downloads folder', 'info')
+    } finally {
+      setLocalBackupBusy(false)
+    }
   }
 
   async function inspectAndStage(parsed: unknown) {
@@ -194,6 +226,56 @@ export function DataManagement() {
   return (
     <div className="settings-section">
       <h2>Data Management</h2>
+
+      {appSettings && (
+        <div className="settings-subsection">
+          <h3>Local Backup on Launch</h3>
+          <p className="page__note">
+            When enabled, a full-database backup is saved automatically every time the app opens — no need to
+            remember to export manually.
+          </p>
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={appSettings.localBackup.enabled}
+              onChange={(e) => handleToggleLocalBackup(e.target.checked)}
+            />
+            Automatically back up on every launch
+          </label>
+
+          {isDirectoryPickerSupported() ? (
+            <div className="settings-section__actions">
+              <p className="page__note">
+                Currently saving to:{' '}
+                <strong>
+                  {appSettings.localBackup.destination === 'directory' && appSettings.localBackup.directoryName
+                    ? appSettings.localBackup.directoryName
+                    : 'Downloads folder'}
+                </strong>
+              </p>
+              <button type="button" className="button button--secondary" onClick={handleChooseLocalBackupDirectory} disabled={localBackupBusy}>
+                {appSettings.localBackup.destination === 'directory' ? 'Change folder…' : 'Choose a folder…'}
+              </button>
+              {appSettings.localBackup.destination === 'directory' && (
+                <button type="button" className="button button--ghost" onClick={handleUseDownloadsForLocalBackup} disabled={localBackupBusy}>
+                  Use Downloads instead
+                </button>
+              )}
+            </div>
+          ) : (
+            <p className="page__note">
+              Your browser can only save automatic backups to the default Downloads folder — picking a custom folder
+              isn't supported here.
+            </p>
+          )}
+
+          <p className="page__note">
+            {appSettings.localBackup.lastLocalBackupAt
+              ? `Last automatic backup: ${formatTimestamp(appSettings.localBackup.lastLocalBackupAt)}`
+              : 'Not yet backed up automatically.'}
+          </p>
+        </div>
+      )}
 
       <div className="settings-subsection">
         <h3>Export</h3>
