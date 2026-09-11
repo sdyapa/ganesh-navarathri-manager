@@ -275,6 +275,7 @@ export async function applyBackupImport(backup: ParsedBackupFile, mode: ImportMo
           themePreference: backup.settings.appSettings?.themePreference ?? currentSettings.themePreference,
           dashboardTaskPreviewCount: backup.settings.appSettings?.dashboardTaskPreviewCount ?? currentSettings.dashboardTaskPreviewCount,
           driveBackupReminder: currentSettings.driveBackupReminder,
+          localBackup: currentSettings.localBackup,
           updatedAt: nowIso(),
         })
         for (const bundle of backup.years) {

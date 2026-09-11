@@ -198,6 +198,34 @@ export interface DriveBackupReminderSettings {
   lastBackupAt: IsoTimestamp | null
 }
 
+/** Local-only preference (never included in export/import backups — see DriveBackupReminderSettings
+ *  above for why). Drives the silent, no-click full-database backup that runs on every app
+ *  launch (see services/localBackupService.ts). */
+export interface LocalBackupSettings {
+  /** Whether the on-launch backup runs at all. Defaults to true. */
+  enabled: boolean
+  /** 'downloads' — every browser's plain download flow, always lands in the Downloads folder
+   *  and can't be redirected. 'directory' — a user-picked folder via the File System Access API
+   *  (desktop Chrome/Edge only; unsupported everywhere else, including every mobile browser and
+   *  Firefox/Safari). The actual `FileSystemDirectoryHandle` lives in its own Dexie table
+   *  (db/repositories/localBackupHandle.ts), never here — it isn't the kind of value this
+   *  JSON-serialized settings document should carry. */
+  destination: 'downloads' | 'directory'
+  /** Cosmetic label for the picked folder, shown in Settings — e.g. "Backups". Null when
+   *  destination is 'downloads'. */
+  directoryName: string | null
+  lastLocalBackupAt: IsoTimestamp | null
+}
+
+/** The single row in Dexie's `localBackupHandle` table — kept separate from AppSettings because
+ *  a FileSystemDirectoryHandle shouldn't live inside a document that flows through
+ *  JSON.stringify on every backup export (see backupExport.ts's downloadJsonFile). Never
+ *  imported outside db/ itself; use db/repositories/localBackupHandle.ts. */
+export interface LocalBackupHandleRecord {
+  id: 'directory'
+  handle: FileSystemDirectoryHandle
+}
+
 /** How row actions (Edit, Delete, Duplicate, Move to Expenses, etc.) render everywhere in the
  *  app — 'text' matches the app's original appearance exactly, so this is the default and
  *  nothing changes visually until a user opts into icons from Settings. */
@@ -221,6 +249,7 @@ export interface AppSettings {
    *  Dashboard.tsx. Defaults to 3; a committee with a busier task list can raise it. */
   dashboardTaskPreviewCount: number
   driveBackupReminder: DriveBackupReminderSettings
+  localBackup: LocalBackupSettings
   updatedAt: IsoTimestamp
 }
 

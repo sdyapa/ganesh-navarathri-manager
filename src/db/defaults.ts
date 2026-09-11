@@ -1,4 +1,4 @@
-import type { ActionDisplayMode, Category, DriveBackupReminderSettings, ThemePreference, Unit } from '@/types'
+import type { ActionDisplayMode, Category, DriveBackupReminderSettings, LocalBackupSettings, ThemePreference, Unit } from '@/types'
 import { generateId } from '@/lib/id'
 import { DEFAULT_COMMODITY_TEMPLATE, DEFAULT_MONETARY_TEMPLATE } from '@/lib/whatsapp'
 
@@ -44,4 +44,8 @@ export function buildDefaultWhatsAppTemplates() {
 
 export function buildDefaultDriveBackupReminder(): DriveBackupReminderSettings {
   return { intervalDays: DEFAULT_DRIVE_REMINDER_INTERVAL_DAYS, lastBackupAt: null }
+}
+
+export function buildDefaultLocalBackupSettings(): LocalBackupSettings {
+  return { enabled: true, destination: 'downloads', directoryName: null, lastLocalBackupAt: null }
 }

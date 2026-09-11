@@ -6,6 +6,7 @@ import {
   DEFAULT_DISPLAY_NAME,
   DEFAULT_THEME_PREFERENCE,
   buildDefaultDriveBackupReminder,
+  buildDefaultLocalBackupSettings,
   buildDefaultWhatsAppTemplates,
 } from '@/db/defaults'
 import type { ActionDisplayMode, AppSettings, ThemePreference, WhatsAppTemplates } from '@/types'
@@ -23,6 +24,7 @@ export function withAppSettingsDefaults(settings: AppSettings): AppSettings {
     themePreference: settings.themePreference ?? DEFAULT_THEME_PREFERENCE,
     dashboardTaskPreviewCount: settings.dashboardTaskPreviewCount ?? DEFAULT_DASHBOARD_TASK_PREVIEW_COUNT,
     driveBackupReminder: settings.driveBackupReminder ?? buildDefaultDriveBackupReminder(),
+    localBackup: settings.localBackup ?? buildDefaultLocalBackupSettings(),
   }
 }
 
@@ -37,6 +39,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     themePreference: DEFAULT_THEME_PREFERENCE,
     dashboardTaskPreviewCount: DEFAULT_DASHBOARD_TASK_PREVIEW_COUNT,
     driveBackupReminder: buildDefaultDriveBackupReminder(),
+    localBackup: buildDefaultLocalBackupSettings(),
     updatedAt: nowIso(),
   }
   await db.appSettings.put(created)
@@ -83,6 +86,34 @@ export async function recordDriveBackupCompleted(): Promise<void> {
   await db.appSettings.put({
     ...current,
     driveBackupReminder: { ...current.driveBackupReminder, lastBackupAt: nowIso() },
+    updatedAt: nowIso(),
+  })
+}
+
+export async function updateLocalBackupEnabled(enabled: boolean): Promise<void> {
+  const current = await getAppSettings()
+  await db.appSettings.put({ ...current, localBackup: { ...current.localBackup, enabled }, updatedAt: nowIso() })
+}
+
+/** Called after every successful on-launch local backup write, whichever destination it landed
+ *  in — see services/localBackupService.ts. */
+export async function recordLocalBackupCompleted(): Promise<void> {
+  const current = await getAppSettings()
+  await db.appSettings.put({
+    ...current,
+    localBackup: { ...current.localBackup, lastLocalBackupAt: nowIso() },
+    updatedAt: nowIso(),
+  })
+}
+
+/** Sets destination + directoryName together — picking a folder flips destination to
+ *  'directory'; passing null (folder cleared, or "Use Downloads instead") flips it back. The
+ *  actual FileSystemDirectoryHandle lives in its own table (localBackupHandle.ts), not here. */
+export async function setLocalBackupDirectory(name: string | null): Promise<void> {
+  const current = await getAppSettings()
+  await db.appSettings.put({
+    ...current,
+    localBackup: { ...current.localBackup, destination: name ? 'directory' : 'downloads', directoryName: name },
     updatedAt: nowIso(),
   })
 }

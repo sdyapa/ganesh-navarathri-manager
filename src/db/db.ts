@@ -8,6 +8,7 @@ import type {
   ExpectedExpense,
   Expense,
   KeyEvent,
+  LocalBackupHandleRecord,
   PoojaAssignment,
   Profile,
   Task,
@@ -33,6 +34,7 @@ export class AppDatabase extends Dexie {
   keyEvents!: Table<KeyEvent, string>
   poojaAssignments!: Table<PoojaAssignment, string>
   appSettings!: Table<AppSettings, string>
+  localBackupHandle!: Table<LocalBackupHandleRecord, string>
 
   constructor() {
     super('ganesh-navarathri-manager')
@@ -68,6 +70,11 @@ export class AppDatabase extends Dexie {
       tasks: 'id, yearProfileId, dueDate, done',
       keyEvents: 'id, yearProfileId, date',
       poojaAssignments: 'id, yearProfileId, date',
+    })
+    // v5: one-row table holding the FileSystemDirectoryHandle picked for local backups, kept
+    // out of the appSettings document itself (see LocalBackupHandleRecord's doc comment).
+    this.version(5).stores({
+      localBackupHandle: 'id',
     })
   }
 }
