@@ -7,6 +7,7 @@
 // On-screen React components must keep using formatCurrency from '@/lib/currency' directly.
 import { formatCurrencyForPdf, formatNumber } from '@/lib/currency'
 import { formatDisplayDate } from '@/lib/date'
+import { pluralize } from '@/lib/pluralize'
 import type { Auction, Category, CommodityTotal, Donation, Expense, FinancialSummary, Unit } from '@/types'
 import type { CategoryTotal } from '@/lib/calculations'
 import type { PdfTableSpec } from './pdf'
@@ -91,7 +92,7 @@ export function buildSummaryLines(summary: FinancialSummary): string[] {
     // comments in types/index.ts).
     `Opening Balance: ${formatCurrencyForPdf(summary.openingBalance)}`,
     `Monetary Donations: ${formatCurrencyForPdf(summary.totalMonetaryDonations)} (${summary.counts.monetaryDonations})`,
-    `Commodity Donations: ${summary.counts.commodityDonations} entr(y/ies)`,
+    `Commodity Donations: ${pluralize(summary.counts.commodityDonations, 'entry', 'entries')}`,
     `Total Expenses: ${formatCurrencyForPdf(summary.totalExpenses)} (${summary.counts.expenses})`,
     `Closing Balance: ${formatCurrencyForPdf(summary.closingBalance)}`,
     `Auction Proceeds (pledged, collected next year): ${formatCurrencyForPdf(summary.totalAuctionProceeds)} (${summary.counts.auctions})`,
@@ -107,7 +108,7 @@ export function buildOverallSummaryLines(summary: FinancialSummary): string[] {
   return [
     `Opening Balance: ${formatCurrencyForPdf(summary.openingBalance)}`,
     `Monetary Donations: ${formatCurrencyForPdf(summary.totalMonetaryDonations)} (${summary.counts.monetaryDonations})`,
-    `Commodity Donations: ${summary.counts.commodityDonations} entr(y/ies)`,
+    `Commodity Donations: ${pluralize(summary.counts.commodityDonations, 'entry', 'entries')}`,
     `Total Expenses: ${formatCurrencyForPdf(summary.totalExpenses)} (${summary.counts.expenses})`,
     `Closing Balance: ${formatCurrencyForPdf(summary.closingBalance)}`,
     `Auction Proceeds (pledged, collected next year): ${formatCurrencyForPdf(summary.totalAuctionProceeds)} (${summary.counts.auctions})`,

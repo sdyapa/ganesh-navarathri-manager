@@ -9,6 +9,7 @@ import { applyBackupImport, inspectBackupFile, type BackupInspection, type Impor
 import { getResetImpact, resetApplication } from '@/services/resetService'
 import { seedSampleData } from '@/services/sampleDataService'
 import { detectOwnRepo, fetchBackupFromGitHub, listGitHubBackupFiles, type GitHubBackupFile } from '@/lib/githubImport'
+import { pluralize } from '@/lib/pluralize'
 
 export function DataManagement() {
   const { years, currentYear, setCurrentYearId } = useYearContext()
@@ -148,7 +149,7 @@ export function DataManagement() {
         result.inserted.keyEvents +
         result.inserted.poojaAssignments
       showToast(
-        `Import complete: ${total} record(s) added${result.skippedDuplicates ? `, ${result.skippedDuplicates} duplicate(s) skipped` : ''}.`,
+        `Import complete: ${pluralize(total, 'record')} added${result.skippedDuplicates ? `, ${pluralize(result.skippedDuplicates, 'duplicate')} skipped` : ''}.`,
       )
     } catch {
       showToast('Import failed. No changes were made — please check the backup file.', 'error')

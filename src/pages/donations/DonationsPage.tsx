@@ -22,6 +22,7 @@ import { copyDonationsToExpected } from '@/services/copyForwardService'
 import { revertDonationToExpected } from '@/services/conversionService'
 import { getOrCreateNextYearProfile } from '@/services/yearService'
 import { formatCurrency, formatCurrencyForPdf, formatNumber } from '@/lib/currency'
+import { pluralize } from '@/lib/pluralize'
 import { formatDisplayDate, isDateInRange, todayDateOnly } from '@/lib/date'
 import { matchesSearch, sortByKey, type SortDirection } from '@/lib/tableUtils'
 import { diffFields } from '@/lib/diff'
@@ -200,7 +201,7 @@ export function DonationsPage() {
       const count = await copyDonationsToExpected([...selectedIds], targetYearId)
       setSelectedIds(new Set())
       setModal({ mode: 'closed' })
-      showToast(`Copied ${count} donation(s) to Expected Donations in ${targetYearName}`)
+      showToast(`Copied ${pluralize(count, 'donation')} to Expected Donations in ${targetYearName}`)
     } finally {
       setBusy(false)
     }
@@ -434,7 +435,7 @@ export function DonationsPage() {
       {modal.mode === 'copy' && currentYear && (
         <CopyToYearModal
           title="Copy to Expected Donations"
-          itemLabel={`${selectedIds.size} donation(s)`}
+          itemLabel={pluralize(selectedIds.size, 'donation')}
           sourceYear={currentYear}
           years={years}
           busy={busy}

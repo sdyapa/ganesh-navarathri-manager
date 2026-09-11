@@ -27,6 +27,7 @@ import { buildPdfReport, pdfFileName } from '@/lib/export/pdf'
 import { buildAuctionsTable } from '@/lib/export/reportBuilders'
 import { exportTableReportAsPng, pngFileName } from '@/lib/export/png'
 import { getAppSettings } from '@/db/repositories/settings'
+import { pluralize } from '@/lib/pluralize'
 import { EDIT_ICON, DELETE_ICON, DUPLICATE_ICON, MOVE_ICON } from '@/lib/actionIcons'
 import type { AuctionInput, DonationInput } from '@/lib/validation'
 import type { Auction, Category, YearProfile } from '@/types'
@@ -191,7 +192,7 @@ export function AuctionsPage() {
         yearName: currentYear.name,
         reportTitle: 'Auction Report',
         appName: displayName,
-        summaryLines: [`Total Auction Proceeds: ${formatCurrencyForPdf(total)} (${auctionCount} item(s))`],
+        summaryLines: [`Total Auction Proceeds: ${formatCurrencyForPdf(total)} (${pluralize(auctionCount, 'item')})`],
         table: buildAuctionsTable(filtered),
       })
       doc.save(pdfFileName(currentYear.name, 'Auction Report'))
@@ -208,7 +209,7 @@ export function AuctionsPage() {
         appName: displayName,
         reportTitle: 'Auction Report',
         yearName: currentYear.name,
-        summaryLines: [`Total Auction Proceeds: ${formatCurrency(total)} (${auctionCount} item(s))`],
+        summaryLines: [`Total Auction Proceeds: ${formatCurrency(total)} (${pluralize(auctionCount, 'item')})`],
         tables: [{ table: buildAuctionsTable(filtered, formatCurrency) }],
       })
     } catch {
@@ -254,7 +255,7 @@ export function AuctionsPage() {
 
       {auctions.length > 0 && (
         <div className="stat-grid stat-grid--compact">
-          <StatCard label="Total Auction Proceeds" value={formatCurrency(total)} tone="positive" hint={`${auctionCount} item(s)`} />
+          <StatCard label="Total Auction Proceeds" value={formatCurrency(total)} tone="positive" hint={pluralize(auctionCount, 'item')} />
         </div>
       )}
 

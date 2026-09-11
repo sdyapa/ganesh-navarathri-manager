@@ -6,10 +6,13 @@ import { useTasks, useAppSettings } from '@/hooks/useYearData'
 import { StatCard } from '@/components/common/StatCard'
 import { EmptyState } from '@/components/common/EmptyState'
 import { ExportButtons } from '@/components/common/ExportButtons'
+import { BalanceGauge } from '@/components/common/BalanceGauge'
 import { useToast } from '@/context/ToastContext'
 import { formatCurrency } from '@/lib/currency'
 import { formatDisplayDate, todayDateOnly } from '@/lib/date'
 import { sortByKey } from '@/lib/tableUtils'
+import { pluralize } from '@/lib/pluralize'
+import { computeSpentFraction } from '@/lib/calculations'
 import { buildPdfReport, pdfFileName } from '@/lib/export/pdf'
 import {
   buildSummaryLines,
@@ -153,13 +156,11 @@ export function Dashboard() {
         <h2 id="actual-heading" className="section-title">
           Actual (Cash in Hand)
         </h2>
-        <div className={`balance-banner ${summary.closingBalance >= 0 ? 'balance-banner--positive' : 'balance-banner--negative'}`}>
-          <div>
-            <div className="balance-banner__label">Closing Balance</div>
-            <div className="balance-banner__hint">Opening {formatCurrency(summary.openingBalance)} + Donations {formatCurrency(summary.totalMonetaryDonations)} − Expenses {formatCurrency(summary.totalExpenses)}</div>
-          </div>
-          <div className="balance-banner__value">{formatCurrency(summary.closingBalance)}</div>
-        </div>
+        <BalanceGauge
+          spentFraction={computeSpentFraction(summary.openingBalance, summary.totalMonetaryDonations, summary.totalExpenses)}
+          valueLabel={formatCurrency(summary.closingBalance)}
+          subLabel={`Closing Balance · Opening ${formatCurrency(summary.openingBalance)} + Donations ${formatCurrency(summary.totalMonetaryDonations)} − Expenses ${formatCurrency(summary.totalExpenses)}`}
+        />
 
         {taskPreviewCount > 0 && upcomingTasks.length > 0 && (
           <div className="heads-up">
@@ -183,19 +184,19 @@ export function Dashboard() {
           <StatCard
             label="Monetary Donations"
             value={formatCurrency(summary.totalMonetaryDonations)}
-            hint={`${summary.counts.monetaryDonations} donation(s)`}
+            hint={pluralize(summary.counts.monetaryDonations, 'donation')}
             tone="positive"
           />
           <StatCard
             label="Commodity Donations"
             value={String(totalCommodityQty)}
-            hint={`${summary.counts.commodityDonations} donation(s) — see Reports for quantities`}
+            hint={`${pluralize(summary.counts.commodityDonations, 'donation')} — see Reports for quantities`}
             tone="muted"
           />
           <StatCard
             label="Expenses"
             value={formatCurrency(summary.totalExpenses)}
-            hint={`${summary.counts.expenses} entr(y/ies)`}
+            hint={pluralize(summary.counts.expenses, 'entry', 'entries')}
             tone="negative"
           />
         </div>
@@ -227,7 +228,7 @@ export function Dashboard() {
           <StatCard
             label="Auction Proceeds"
             value={formatCurrency(summary.totalAuctionProceeds)}
-            hint={`${summary.counts.auctions} item(s) — collected next year`}
+            hint={`${pluralize(summary.counts.auctions, 'item')} — collected next year`}
             tone="muted"
           />
         </div>

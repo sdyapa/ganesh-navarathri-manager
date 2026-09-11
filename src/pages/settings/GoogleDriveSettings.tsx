@@ -239,7 +239,7 @@ export function GoogleDriveSettings() {
               onChange={(e) => setReminderInput(e.target.value)}
               style={{ width: 70 }}
             />
-            <span>day(s)</span>
+            <span>days</span>
             <button type="button" className="button button--secondary" onClick={handleSaveReminderInterval}>
               Save
             </button>

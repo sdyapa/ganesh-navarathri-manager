@@ -21,6 +21,7 @@ import { copyExpensesToExpected } from '@/services/copyForwardService'
 import { revertExpenseToExpected } from '@/services/conversionService'
 import { getOrCreateNextYearProfile } from '@/services/yearService'
 import { formatCurrency, formatCurrencyForPdf } from '@/lib/currency'
+import { pluralize } from '@/lib/pluralize'
 import { formatDisplayDate, isDateInRange, todayDateOnly } from '@/lib/date'
 import { matchesSearch, sortByKey, type SortDirection } from '@/lib/tableUtils'
 import { diffFields } from '@/lib/diff'
@@ -215,7 +216,7 @@ export function ExpensesPage() {
       const count = await copyExpensesToExpected([...selectedIds], targetYearId)
       setSelectedIds(new Set())
       setModal({ mode: 'closed' })
-      showToast(`Copied ${count} expense(s) to Expected Expenses in ${targetYearName}`)
+      showToast(`Copied ${pluralize(count, 'expense')} to Expected Expenses in ${targetYearName}`)
     } finally {
       setBusy(false)
     }
@@ -447,7 +448,7 @@ export function ExpensesPage() {
       {modal.mode === 'copy' && currentYear && (
         <CopyToYearModal
           title="Copy to Expected Expenses"
-          itemLabel={`${selectedIds.size} expense(s)`}
+          itemLabel={pluralize(selectedIds.size, 'expense')}
           sourceYear={currentYear}
           years={years}
           busy={busy}

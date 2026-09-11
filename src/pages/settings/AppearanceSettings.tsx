@@ -119,7 +119,7 @@ export function AppearanceSettings() {
             onChange={(e) => setTaskPreviewInput(e.target.value)}
             style={{ width: 70 }}
           />
-          <span>upcoming task(s)</span>
+          <span>upcoming tasks</span>
           <button type="button" className="button button--secondary" onClick={handleSaveTaskPreviewCount}>
             Save
           </button>
