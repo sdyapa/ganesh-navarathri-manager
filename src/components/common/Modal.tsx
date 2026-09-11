@@ -9,6 +9,18 @@ interface ModalProps {
   size?: 'sm' | 'md' | 'lg'
 }
 
+// Tracks how many Modals are currently mounted at once, app-wide — a form's own Modal plus a
+// "Discard Unsaved Changes?"/"Confirm Changes" Modal opened on top of it (via useCloseGuard or
+// the edit-confirm flow) are common, and each Modal used to independently save/restore
+// document.body.style.overflow on its own mount/unmount. When two stacked modals unmounted
+// together, whichever cleanup ran last would restore the OUTER modal's saved value — 'hidden',
+// captured while the first modal was already open — permanently freezing page scroll/
+// interaction after closing both (see the "discard freezes the app" bug this fixed). A shared
+// counter fixes it: overflow is set to 'hidden' only when the count goes 0 -> 1, and only
+// restored to its true original value when the count goes back to 0.
+let openModalCount = 0
+let overflowBeforeAnyModal = ''
+
 export function Modal({ title, onClose, children, footer, size = 'md' }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null)
   // Read via a ref inside the effect below rather than listing onClose as a dependency —
@@ -26,11 +38,13 @@ export function Modal({ title, onClose, children, footer, size = 'md' }: ModalPr
     }
     document.addEventListener('keydown', onKeyDown)
     dialogRef.current?.focus()
-    const previousOverflow = document.body.style.overflow
+    if (openModalCount === 0) overflowBeforeAnyModal = document.body.style.overflow
+    openModalCount += 1
     document.body.style.overflow = 'hidden'
     return () => {
       document.removeEventListener('keydown', onKeyDown)
-      document.body.style.overflow = previousOverflow
+      openModalCount -= 1
+      if (openModalCount === 0) document.body.style.overflow = overflowBeforeAnyModal
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately mount/unmount only, see comment above
   }, [])
