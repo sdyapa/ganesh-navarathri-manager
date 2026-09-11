@@ -292,6 +292,35 @@ because the other three import modes (and a plain in-app add/edit/delete) work c
 that extra step, so nothing looks wrong until someone specifically imports via replace-all or
 resets the app.
 
+**Import from GitHub** (`lib/githubImport.ts`) is a second way to get a backup's JSON into the
+same pipeline above — it never touches `applyBackupImport`/`inspectBackupFile` itself, it just
+produces the same `unknown` payload the file-picker's `FileReader.onload` does, then hands it to
+the identical `inspectAndStage()` helper in `pages/settings/DataManagement.tsx`. Three pieces:
+
+- `toGitHubRawUrl(input)` — normalizes either a `github.com/.../blob/<ref>/<path>` URL or an
+  already-raw `raw.githubusercontent.com` URL down to the raw-content URL to fetch; returns
+  `null` (never throws) for anything else, so a garbage/non-GitHub URL fails with a clear message
+  instead of silently trying to fetch an arbitrary site.
+- `listGitHubBackupFiles(owner, repo, branch, basePath = 'backups')` — recursively walks GitHub's
+  public Contents API (`api.github.com/repos/.../contents/<path>`) starting at `basePath`
+  (matching this repo's own `backups/` convention — see `backups/README.md`) and returns every
+  `.json` file found, newest path first. No auth token is ever sent — this only works against
+  **public** repos, deliberately (same "no backend, no secrets" posture as `lib/googleDrive.ts`).
+  Unauthenticated GitHub API calls are capped at 60 requests/hour per IP; each subfolder visited
+  is one request, so this is fine for occasional use but shouldn't be polled.
+- `detectOwnRepo()` — reads `window.location` to guess this deployment's own `owner`/`repo`
+  automatically, since a GitHub Pages *project* page is always served from exactly
+  `<owner>.github.io/<repo>/...`. Returns `null` for local dev or a user/org root page, where
+  there's nothing to guess; the Settings UI falls back to letting the user type both fields in.
+- `fetchBackupFromGitHub(urlOrRawUrl)` — fetches + JSON-parses, returning a `{ok: true, data}` /
+  `{ok: false, error}` result rather than throwing, so `DataManagement.tsx` can show the error
+  inline the same way a malformed local file already does.
+
+`pages/settings/DataManagement.tsx`'s "Import from GitHub" subsection is the primary UI (browse
+`backups/`, click Import… next to a listed file); a collapsed `<details>` underneath keeps the
+older "paste one exact file link" flow available for a file outside the auto-detected `backups/`
+convention, or a repo where browsing isn't wanted.
+
 ### 2.10 Dashboard, Reports & the Financial Calculation Engine
 
 | Layer | File(s) |
@@ -315,6 +344,34 @@ to `type === 'monetary'` first, same as these two.
 `buildOverallSummaryLines` (in `lib/export/reportBuilders.ts`) instead of the normal
 `buildSummaryLines` — the only difference is it omits the two "Expected …" lines, since a
 season-end shareable report shouldn't show pending pledges as if they were relevant anymore.
+
+**Closing Balance banner** — `.balance-banner`/`.balance-banner__*` classes in `global.css`,
+rendered in `Dashboard.tsx` right above the `stat-grid`. Deliberately pulled out of `StatCard`'s
+grid (where it used to sit as a same-size tile among four others) into its own full-width,
+sign-colored banner — a real user reported it was "difficult to find … mixed along the other
+tiles" once there were several stat cards competing for attention. `<StatCard label="Closing
+Balance">` was removed from the grid entirely rather than kept as a duplicate.
+
+**Dashboard "Heads Up"** (`.heads-up`/`.heads-up__*` classes) — a short preview of the soonest-
+due pending Tasks, rendered directly below the balance banner:
+```ts
+const upcomingTasks = useMemo(() => {
+  if (!tasks) return []
+  return sortByKey(tasks.filter((t) => !t.done), 'dueDate', 'asc').slice(0, taskPreviewCount)
+}, [tasks, taskPreviewCount])
+```
+Reuses `useTasks(currentYearId)` (`hooks/useYearData.ts`) and the same `sortByKey` helper every
+list page's sort control already uses (§2.13) — no new sorting logic. `taskPreviewCount` comes
+from `AppSettings.dashboardTaskPreviewCount` (default `3`, portable — travels in backups exactly
+like `actionDisplayMode`/`themePreference`, see §2.9's incident note for why every new
+`AppSettings` field needs the same three touch points: `db/defaults.ts`'s default constant,
+`withAppSettingsDefaults`'s backfill, and the backup export/import/validation trio). Setting it
+to `0` hides the section entirely (`taskPreviewCount > 0 && upcomingTasks.length > 0` guards the
+render) rather than showing an empty box. Edited from **Settings → Appearance**
+(`AppearanceSettings.tsx`), which follows `GoogleDriveSettings.tsx`'s existing "local draft state
+synced from the field alone, not the whole settings object" pattern for a free-typed number
+input (see that file's own comment for why depending on the whole object would clobber an
+unsaved keystroke the moment any other setting on the page saves).
 
 ### 2.11 WhatsApp Sharing
 
@@ -479,6 +536,15 @@ be UTC ISO strings, since timezone-shifting a bookkeeping timestamp is harmless,
 a financial date). `lib/currency.ts` handles `en-IN` formatting (`formatCurrency`,
 `formatCurrencyForPdf`, `formatNumber`).
 
+`formatFileTimestamp(iso)` is the odd one out — unlike every other helper in this file, it's
+explicitly for *exported filenames* (backups, PDF/PNG reports), not on-screen display, so it
+includes the time (`"2026-09-11-1743"`, local, filename-safe — no colons) rather than just the
+date. Without it, exporting the same report twice in one day silently produced the same
+filename and relied on the browser to append `"(1)"`. Safe to parse via `new Date(iso)` here
+specifically because its input is always a full ISO timestamp with an explicit time (`nowIso()`
+or `new Date().toISOString()`), never a bare date-only string — the UTC-shift pitfall this file's
+other helpers guard against only bites date-*only* strings.
+
 ### 3.3 IDs
 
 `lib/id.ts`'s `generateId()` is `crypto.randomUUID()` with a fallback for very old browsers.
@@ -521,6 +587,21 @@ depends on `[]`, not `[onClose]`, reading the latest `onClose` via a ref
 freshly-created closure each render (e.g. `useCloseGuard`'s `requestClose`), and depending on
 `[onClose]` directly caused the effect to re-run — and steal focus back to the dialog — on every
 single keystroke in every form app-wide. Don't "simplify" this back to `[onClose]`.
+
+**Stacked modals and `document.body.style.overflow`** — `Modal` locks page scroll while open by
+setting `document.body.style.overflow = 'hidden'`, restoring whatever it was before on unmount.
+Modals routinely stack: `useCloseGuard`'s "Discard Unsaved Changes?" dialog (§3.4) opens *on top
+of* the still-mounted form it belongs to, and the edit-confirm flow (also §3.4) does the same.
+Each `Modal` instance used to save/restore this independently — when two stacked modals unmounted
+together, whichever cleanup ran last would restore the *outer* modal's saved value (`'hidden'`,
+captured while the inner one was already open), permanently freezing page scroll/interaction
+after closing both. This is exactly the bug a user hit clicking "Discard" on a filled-in Add
+Expense form. Fixed with a module-level open-modal counter (`openModalCount` /
+`overflowBeforeAnyModal` in `Modal.tsx`): the true original value is captured only when the count
+goes 0→1, and only restored when it goes back to 0 — so any depth of modal stacking unwinds
+correctly. If you ever need a second place that toggles `document.body.style.overflow` (or any
+other single shared global reset on unmount), use the same counter pattern rather than a plain
+per-instance save/restore.
 
 ### 3.6 Responsive Tables: `DataTable.tsx`
 

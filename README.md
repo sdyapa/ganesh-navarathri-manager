@@ -119,6 +119,12 @@ A festival calendar, per year, at **Calendar**, with two views:
 
 - **Dashboard** clearly separates *Actual (Cash in Hand)* from *Expected (Promised, Not Yet
   Received)*, so a pledge or an auction win is never mistaken for money already in hand.
+  **Closing Balance** gets its own high-contrast banner at the top of the Actual section — colored
+  green or red by sign — rather than sitting as just one more tile among several, since it's the
+  single number most people check first.
+- **"Heads Up"** — right below the Closing Balance banner, a short preview of your soonest-due
+  pending Tasks (see [§2.6](#26-tasks)), with a link to the full Tasks page. How many show is
+  configurable in **Settings → Appearance** (default 3; set to 0 to hide the section).
 - **Reports** page — donations/expenses by category, a donations-vs-expenses-vs-auction chart,
   day-by-day cash flow, and commodity totals grouped strictly by (commodity name, unit) so, say,
   50 kg of rice is never added to 10 litres of oil.
@@ -373,16 +379,31 @@ events, and pooja roster entries), and categories/units/profiles/settings.
 
 - **Export**: **Settings → Data Management** → export the current year, a specific year, or the
   entire database. This is also how you produce the file described in
-  [§8.3](#83-storing-yearly-backups-in-this-repo) below.
-- **Import**: choose a file; the app inspects it, shows exactly what it contains (years, record
-  counts per type, categories/units/people-vendors included), and only then asks how to apply
-  it:
-  - **Add as new data** — inserts everything (a year already present locally is added into).
-  - **Add, but skip duplicates** — same, but records that look identical to an existing one
-    are skipped.
-  - **Replace selected year** — only offered for single-year backups; deletes the matching
-    local year first.
-  - **Replace entire database** — wipes everything and restores exactly what's in the backup.
+  [§8.3](#83-storing-yearly-backups-in-this-repo) below. Every exported filename includes the
+  date **and time** (e.g. `ganesh-navarathri-2026-backup-2026-09-11-1743.json`), so exporting
+  more than once in the same day — say, once mid-season and again after immersion — always
+  produces a distinct file instead of colliding on name.
+- **Import** — three ways to get a backup file into the app, all funneling into the same
+  inspect-then-confirm flow described below:
+  - **Choose a file** from your device, same as always.
+  - **Browse from GitHub**: enter an owner/repo/branch (this deployment's own repo is detected
+    automatically when it's running on GitHub Pages) and click **Browse backups/** to list every
+    backup already committed to that repo's `backups/` archive — click **Import…** next to the
+    one you want. This only works for a **public** repo (no sign-in, no token — the same
+    "no backend, no secrets" design as Google Drive's narrow scope, see §7); on a phone this
+    skips downloading the file and re-uploading it.
+  - **Paste a direct link**: tucked under "Or paste a direct file link instead" for a specific
+    file link (either the normal `github.com/.../blob/...` URL or a raw
+    `raw.githubusercontent.com` URL) without browsing the folder.
+  - Whichever way it arrives, the app inspects it, shows exactly what it contains (years, record
+    counts per type, categories/units/people-vendors included), and only then asks how to apply
+    it:
+    - **Add as new data** — inserts everything (a year already present locally is added into).
+    - **Add, but skip duplicates** — same, but records that look identical to an existing one
+      are skipped.
+    - **Replace selected year** — only offered for single-year backups; deletes the matching
+      local year first.
+    - **Replace entire database** — wipes everything and restores exactly what's in the backup.
 
 No import ever silently overwrites data — the confirmation step is not skippable. Every donor,
 vendor, and auction-participant name in an imported backup is also automatically registered as a
