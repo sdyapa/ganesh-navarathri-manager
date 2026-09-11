@@ -345,15 +345,29 @@ to `type === 'monetary'` first, same as these two.
 `buildSummaryLines` — the only difference is it omits the two "Expected …" lines, since a
 season-end shareable report shouldn't show pending pledges as if they were relevant anymore.
 
-**Closing Balance banner** — `.balance-banner`/`.balance-banner__*` classes in `global.css`,
-rendered in `Dashboard.tsx` right above the `stat-grid`. Deliberately pulled out of `StatCard`'s
-grid (where it used to sit as a same-size tile among four others) into its own full-width,
-sign-colored banner — a real user reported it was "difficult to find … mixed along the other
-tiles" once there were several stat cards competing for attention. `<StatCard label="Closing
-Balance">` was removed from the grid entirely rather than kept as a duplicate.
+**Closing Balance gauge** (`components/common/BalanceGauge.tsx`) — a speedometer-style SVG gauge
+rendered in `Dashboard.tsx` right above the `stat-grid`, replacing an earlier flat-text
+"balance-banner" that itself replaced a `<StatCard>` in the grid — a real user reported the
+original stat-card version was "difficult to find … mixed along the other tiles", and once a
+plain colored-text banner was shipped as the fix, asked specifically for "speedometer like
+graphics", i.e. an actual gauge-with-needle rather than a text callout. `<StatCard
+label="Closing Balance">` was removed from the grid entirely rather than kept as a duplicate.
+
+The needle position is `computeSpentFraction(openingBalance, totalMonetaryDonations,
+totalExpenses)` (`lib/calculations.ts`) — the fraction of funds available so far that's already
+been spent, 0 at the far left (nothing spent) through 1 at the far right (every rupee raised has
+been spent); it can exceed 1 once spending goes negative, which the gauge clamps visually while
+still coloring the number red. Deliberately plain SVG + trigonometry (`polarToCartesian`/
+`arcPath` in `BalanceGauge.tsx`), not a chart library — this is one static shape, not worth
+pulling `chart.js` (already lazy-loaded, and only for the Reports page) in for. Zone/needle
+colors are hardcoded hex values, not `var(--color-*)` tokens, for the same reason every other
+export-relevant visual in this app avoids theme tokens (see §2.16's theme gotchas) — the gauge
+needs to look identical in a PNG export regardless of the active theme, and `exportElementAsPng`
+(Dashboard's existing PNG export) captures it as part of the live DOM with no special-casing
+needed.
 
 **Dashboard "Heads Up"** (`.heads-up`/`.heads-up__*` classes) — a short preview of the soonest-
-due pending Tasks, rendered directly below the balance banner:
+due pending Tasks, rendered directly below the balance gauge:
 ```ts
 const upcomingTasks = useMemo(() => {
   if (!tasks) return []
@@ -422,6 +436,16 @@ present and active.
 (e.g. `"date-desc"`, `"amount-desc"`, `"donorName-asc"`) and does
 `sortByKey(filteredRows, ...sortOption.split('-'))` — `sortByKey` is a single generic helper
 reused by every page rather than each page writing its own comparator.
+
+> **Tiebreak bug (fixed)**: `sortByKey` used to sort ascending (stable, so same-value rows kept
+> their original array order) and then `.reverse()` the whole array for `'desc'` — but
+> `.reverse()` also flips that preserved tie order. A user hit this directly: adding a second
+> expense on the same date made it show up *second* under "Date (Newest first)" instead of on
+> top, since the older same-day row's insertion-order advantage got inverted along with
+> everything else. Fixed by comparing directly with the sign flipped for `'desc'` (multiply the
+> comparator's result by `-1`) instead of sort-then-reverse, which keeps insertion order as the
+> tiebreak in both directions. See `test/tableUtils.test.ts`'s regression test for the exact
+> before/after case. Don't reintroduce a sort-ascending-then-`.reverse()` pattern anywhere new.
 
 ### 2.14 Row Action Icons & Display Mode
 
@@ -544,6 +568,15 @@ filename and relied on the browser to append `"(1)"`. Safe to parse via `new Dat
 specifically because its input is always a full ISO timestamp with an explicit time (`nowIso()`
 or `new Date().toISOString()`), never a bare date-only string — the UTC-shift pitfall this file's
 other helpers guard against only bites date-*only* strings.
+
+**`lib/pluralize.ts`** — `pluralize(count, singular, plural?)` returns e.g. `"1 donation"` /
+`"3 donations"`, computed from `count` rather than the earlier convention of a hardcoded
+`"donation(s)"` string baked into every call site. A user flagged the bracket notation directly
+("Don't want to see that braces"). `plural` defaults to `singular + 's'`; pass it explicitly for
+an irregular form (`pluralize(n, 'entry', 'entries')`). Used at every count-driven UI string
+across Dashboard, the list pages' toasts/`CopyToYearModal` item labels, and
+`reportBuilders.ts`'s summary lines — grep for `pluralize` before adding a new one to reuse it
+rather than writing a fresh `${n} thing(s)` template literal.
 
 ### 3.3 IDs
 

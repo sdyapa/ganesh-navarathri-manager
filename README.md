@@ -119,10 +119,11 @@ A festival calendar, per year, at **Calendar**, with two views:
 
 - **Dashboard** clearly separates *Actual (Cash in Hand)* from *Expected (Promised, Not Yet
   Received)*, so a pledge or an auction win is never mistaken for money already in hand.
-  **Closing Balance** gets its own high-contrast banner at the top of the Actual section — colored
-  green or red by sign — rather than sitting as just one more tile among several, since it's the
-  single number most people check first.
-- **"Heads Up"** — right below the Closing Balance banner, a short preview of your soonest-due
+  **Closing Balance** gets its own speedometer-style gauge at the top of the Actual section —
+  green/amber/red zones and a needle showing how much of the funds raised so far have been
+  spent, with the actual closing balance amount (colored by sign) below it — rather than sitting
+  as just one more tile among several, since it's the single number most people check first.
+- **"Heads Up"** — right below the Closing Balance gauge, a short preview of your soonest-due
   pending Tasks (see [§2.6](#26-tasks)), with a link to the full Tasks page. How many show is
   configurable in **Settings → Appearance** (default 3; set to 0 to hide the section).
 - **Reports** page — donations/expenses by category, a donations-vs-expenses-vs-auction chart,
