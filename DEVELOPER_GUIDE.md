@@ -172,22 +172,27 @@ there's no FK to break.
 2026-08-31 lived (replace-all mode's `db.profiles.bulkAdd` only seeded whatever was *explicit*
 in the backup, unlike every other import mode).
 
-### 2.6 Copy Actual → Expected (Recurring Items)
+### 2.6 Copy Forward to Next Year (Recurring Items)
 
 | Layer | File(s) |
 |---|---|
-| Service | `services/copyForwardService.ts` — `copyExpensesToExpected`, `copyDonationsToExpected` |
-| Component | `components/common/CopyToYearModal.tsx` (shared year-picker; exports `NEXT_YEAR_VALUE`) |
-| DataTable support | `components/common/DataTable.tsx`'s optional `selection` prop (checkboxes) |
-| Pages | `ExpensesPage.tsx` / `DonationsPage.tsx` — `selectedIds` state, `toggleSelected`/`toggleSelectAllOnPage`, "Copy N to Expected …" button |
-| Tests | `describe('copy Actual records forward to Expected (recurring items)')` |
+| Service | `services/copyForwardService.ts` — `copyExpensesToExpected`, `copyDonationsToExpected`, `copyTasksToYear` |
+| Component | `components/common/CopyToYearModal.tsx` (shared year-picker; exports `NEXT_YEAR_VALUE`; optional `description` prop overrides the default "...as pending Expected records..." body copy for callers like Tasks where that wording doesn't apply) |
+| DataTable support | `components/common/DataTable.tsx`'s optional `selection` prop (checkboxes) — Tasks uses its own lighter-weight `selectedIds`/`toggleSelected` state directly on the card list instead, since it isn't `DataTable`-based |
+| Pages | `ExpensesPage.tsx` / `DonationsPage.tsx` — `selectedIds` state, `toggleSelected`/`toggleSelectAllOnPage`, "Copy N to Expected …" button. `TasksPage.tsx` — same `selectedIds` pattern, "Copy N tasks to Next Year" button |
+| Tests | `describe('copy Actual records forward to Expected (recurring items)')` in `integration.test.ts` |
 
 Each function takes an array of source-record ids and a `targetYearId`, reads each source record
-(`getExpense`/`getDonation`), and calls `insertExpectedExpense`/`insertExpectedDonation` with a
-**freshly built input** (today's date as the expected date, source amount/category/notes/vendor
-carried over) — the source record itself is never touched. `NEXT_YEAR_VALUE` is a sentinel the
-modal uses so "copy into next year" can offer a not-yet-created year as an option; the page
-resolves it via `getOrCreateNextYearProfile` only once the user actually confirms.
+(`getExpense`/`getDonation`/`getTask`), and inserts a **freshly built record** in the target year
+— the source record itself is never touched. `copyExpensesToExpected`/`copyDonationsToExpected`
+default the copy's date to today (the amount is what matters; the user retypes the real date once
+known). `copyTasksToYear` instead shifts the task's `dueDate` by the exact year gap via
+`addYears()` (`lib/date.ts`) — a due date is meaningful on its own, so a recurring task like "Book
+priest" should land on the same festival day next year automatically rather than resetting to
+today or requiring the date to be re-picked by hand — and copies checklist items across reset to
+unchecked (a copy is a new occurrence, not a continuation of last year's progress). `NEXT_YEAR_VALUE`
+is a sentinel the modal uses so "copy into next year" can offer a not-yet-created year as an
+option; the page resolves it via `getOrCreateNextYearProfile` only once the user actually confirms.
 
 ### 2.7 Tasks
 
@@ -195,7 +200,7 @@ resolves it via `getOrCreateNextYearProfile` only once the user actually confirm
 |---|---|
 | Types | `Task`, `TaskChecklistItem` in `types/index.ts` |
 | Dexie table | `tasks: 'id, yearProfileId, dueDate, done'` (added in `db.ts` v4) |
-| Repository | `db/repositories/tasks.ts` — `insertTask`, `updateTask`, `deleteTask`, `setTaskDone`, `addChecklistItem`/`toggleChecklistItem`/`removeChecklistItem` |
+| Repository | `db/repositories/tasks.ts` — `insertTask`, `getTask`, `updateTask`, `deleteTask`, `setTaskDone`, `addChecklistItem`/`toggleChecklistItem`/`removeChecklistItem` |
 | Hook | `hooks/useYearData.ts` → `useTasks` |
 | Page | `pages/tasks/TasksPage.tsx`, `pages/tasks/TaskForm.tsx` |
 | Validation | `taskInputSchema` in `lib/validation.ts` (`checklistItems: string[]`, only consumed at creation) |
@@ -207,6 +212,8 @@ three checklist-mutation functions in `tasks.ts` follow the same shape: read the
 new `checklist` array, `db.tasks.update(id, { checklist, updatedAt })`. `TaskForm.tsx` only
 shows the "Checklist Items" textarea when its `showChecklistInput` prop is true (Add mode only —
 editing a task never touches its checklist; that's managed live from the task card instead).
+
+Tasks can also be copied forward to another year — see §2.6 above (`copyTasksToYear`).
 
 ### 2.8 Festival Calendar (Key Events & Pooja Roster)
 
@@ -559,6 +566,11 @@ also owns `nowIso()` for `createdAt`/`updatedAt` bookkeeping timestamps (those *
 be UTC ISO strings, since timezone-shifting a bookkeeping timestamp is harmless, unlike shifting
 a financial date). `lib/currency.ts` handles `en-IN` formatting (`formatCurrency`,
 `formatCurrencyForPdf`, `formatNumber`).
+
+`addYears(dateOnly, years)` shifts a date-only string by whole years while preserving month/day
+(e.g. `"2026-09-20"` + 1 → `"2027-09-20"`), clamping Feb 29 down to Feb 28 on a non-leap target
+year — used by `copyTasksToYear` (§2.6) so a copied task's due date lands on the same festival day
+next year rather than resetting to today.
 
 `formatFileTimestamp(iso)` is the odd one out — unlike every other helper in this file, it's
 explicitly for *exported filenames* (backups, PDF/PNG reports), not on-screen display, so it

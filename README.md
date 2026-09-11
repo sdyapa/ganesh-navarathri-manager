@@ -102,6 +102,11 @@ A simple TODO list for festival prep, per year, at **Tasks**:
   "Flowers", "Coconuts", "Camphor" — checked off individually as they're bought. Checklist items
   can be added at creation (one per line) or any time afterward from the task itself, and
   removed individually.
+- **Copy to Next Year**: select one or more tasks and copy them into next year (or any existing
+  year) as fresh, unchecked to-dos — checklist items come along too, all reset to unchecked. Due
+  dates shift by the same number of years so a recurring task (e.g. "Book priest") lands on the
+  same festival day automatically rather than needing to be re-picked by hand. The source tasks
+  are left untouched.
 
 ### 2.7 Calendar (Key Events & Pooja Roster)
 
