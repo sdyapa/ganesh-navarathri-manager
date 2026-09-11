@@ -362,6 +362,27 @@ ul { list-style: none; margin: 0; padding: 0; }
 .balance-banner--negative { background: var(--color-negative-bg); }
 .balance-banner--negative .balance-banner__value { color: var(--color-negative); }
 
+/* Speedometer-style gauge (BalanceGauge.tsx) shown above the Closing Balance banner — needle
+   position = fraction of funds-available-so-far already spent (see calculations.ts's
+   computeSpentFraction). Zone/needle colors are fixed hex values, not theme tokens, so the
+   gauge (and its PNG export) look identical regardless of the active theme — same convention
+   as every other export in this app. */
+.balance-gauge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-4) var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.balance-gauge__svg { width: 100%; max-width: 260px; height: auto; }
+.balance-gauge__readout { text-align: center; margin-top: -8px; }
+.balance-gauge__value { font-size: 1.6rem; font-weight: 800; color: var(--color-text); }
+.balance-gauge__value--negative { color: var(--color-negative); }
+.balance-gauge__sub { font-size: 0.8rem; color: var(--color-text-muted); margin-top: 2px; }
+
 /* Dashboard "Heads Up" — a short preview of upcoming pending tasks, shown right under the
    Closing Balance banner (see Settings > Appearance for the configurable count, default 3). */
 .heads-up {

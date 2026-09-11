@@ -199,3 +199,15 @@ export function computeDailyTrend(
 export function computeCarryForwardOpeningBalance(previousYearClosingBalance: number): number {
   return previousYearClosingBalance
 }
+
+/** What fraction (0-1) of funds available so far (opening balance + monetary donations
+ *  received) has already been spent — the needle position for the Dashboard's speedometer
+ *  gauge (see BalanceGauge.tsx). 0 = nothing spent yet, 1 = every rupee available has been
+ *  spent (closing balance is exactly zero), and it can exceed 1 when spending has gone into
+ *  the negative. Returns 0 when there are no funds available at all (avoids a 0/0 or
+ *  divide-by-zero producing NaN/Infinity on a brand-new year with no records yet). */
+export function computeSpentFraction(openingBalance: number, totalMonetaryDonations: number, totalExpenses: number): number {
+  const available = openingBalance + totalMonetaryDonations
+  if (available <= 0) return totalExpenses > 0 ? 1 : 0
+  return totalExpenses / available
+}

@@ -5,6 +5,7 @@ import {
   computeCommodityTotals,
   computeDailyTrend,
   computeFinancialSummary,
+  computeSpentFraction,
 } from '@/lib/calculations'
 import type { Auction, Donation, ExpectedDonation, ExpectedExpense, Expense } from '@/types'
 
@@ -173,6 +174,40 @@ describe('carry-forward', () => {
       auctions: [],
     })
     expect(summary2027.closingBalance).toBe(60000)
+  })
+})
+
+describe('computeSpentFraction (Dashboard speedometer gauge)', () => {
+  it('is 0 when nothing has been spent yet', () => {
+    expect(computeSpentFraction(0, 100000, 0)).toBe(0)
+  })
+
+  it('is 0.5 when exactly half of funds available so far have been spent', () => {
+    expect(computeSpentFraction(0, 100000, 50000)).toBe(0.5)
+  })
+
+  it('is 1 when spending exactly equals funds available (opening + donations)', () => {
+    expect(computeSpentFraction(20000, 80000, 100000)).toBe(1)
+  })
+
+  it('exceeds 1 when spending has gone into the negative (overspent)', () => {
+    expect(computeSpentFraction(0, 100000, 150000)).toBe(1.5)
+  })
+
+  it('includes the opening balance as funds available, not just this year\'s donations', () => {
+    expect(computeSpentFraction(50000, 50000, 50000)).toBe(0.5)
+  })
+
+  it('returns 0 for a brand-new year with no funds and no expenses (avoids 0/0 = NaN)', () => {
+    expect(computeSpentFraction(0, 0, 0)).toBe(0)
+  })
+
+  it('returns 1 for a year with no funds available but some expenses already recorded (avoids Infinity)', () => {
+    expect(computeSpentFraction(0, 0, 5000)).toBe(1)
+  })
+
+  it('treats a negative opening balance the same way as zero available funds', () => {
+    expect(computeSpentFraction(-10000, 0, 5000)).toBe(1)
   })
 })
 
