@@ -5,6 +5,7 @@ import { BottomNav } from './BottomNav'
 import { TopBar } from './TopBar'
 import { YearSwitcher } from './YearSwitcher'
 import { DriveBackupReminderBanner } from './DriveBackupReminderBanner'
+import { LaunchBackupRunner } from './LaunchBackupRunner'
 import { ToastContainer } from '@/components/common/ToastContainer'
 import { useAppSettings } from '@/hooks/useYearData'
 import { DEFAULT_DISPLAY_NAME } from '@/db/defaults'
@@ -17,6 +18,7 @@ export function AppLayout() {
 
   return (
     <div className="app-shell">
+      <LaunchBackupRunner />
       <Sidebar />
       <div className="app-shell__main">
         {/* Mobile: the switcher lives inside this bar (hidden entirely on desktop). */}
