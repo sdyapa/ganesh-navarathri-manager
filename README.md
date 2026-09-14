@@ -153,13 +153,52 @@ couple of entries to scroll through.
   amounts are deliberately left out of this report, since they're not relevant once the season
   is over.
 
-### 2.9 WhatsApp Sharing
+### 2.9 Inventory
+
+End-of-season equipment (speaker, amplifier, carpets, lights, etc.) tracked at **Inventory** —
+what item, how many, who's currently holding it, and since when. Each item is **Stored** or
+**Returned**:
+
+- **Add an item** with a name, optional quantity, who it's kept with (autocompletes against the
+  same People registry as Donor/Auction-participant names — the same real people commonly hold
+  equipment across years), and the date it was stored.
+- **Mark Returned** / **Mark Stored** toggles an item as it comes back — the default list view
+  shows only **Stored** items, so what's still outstanding stays front and center.
+- **Copy to Next Year** works as a **reconciliation checklist**, not a blind duplicate: select
+  still-**Stored** items at season end and copy them into next year fresh (a **Returned** item
+  has nothing left to track, so it's never offered). Each carried item shows "Carried from
+  {source year}" and starts unchecked ("Stored") in the new year — check it off with **Mark
+  Returned** once the physical item actually comes back. Anything left unchecked by the end of
+  the new season is a ready-made "not yet returned / possibly lost" list. The original item in
+  the prior year is never modified by copying it forward.
+
+### 2.10 Dashboard & Reports
+
+- **Dashboard** clearly separates *Actual (Cash in Hand)* from *Expected (Promised, Not Yet
+  Received)*, so a pledge or an auction win is never mistaken for money already in hand.
+  **Closing Balance** gets its own speedometer-style gauge at the top of the Actual section —
+  green/amber/red zones and a needle showing how much of the funds raised so far have been
+  spent, with the actual closing balance amount (colored by sign) below it — rather than sitting
+  as just one more tile among several, since it's the single number most people check first.
+- **"Heads Up"** — right below the Closing Balance gauge, a short preview of your soonest-due
+  pending Tasks (see [§2.6](#26-tasks)), with a link to the full Tasks page. How many show is
+  configurable in **Settings → Appearance** (default 3; set to 0 to hide the section).
+- **Reports** page — donations/expenses by category, a donations-vs-expenses-vs-auction chart,
+  day-by-day cash flow, and commodity totals grouped strictly by (commodity name, unit) so, say,
+  50 kg of rice is never added to 10 litres of oil.
+- **Overall Summary PDF** (from the Dashboard) — a single shareable report covering opening
+  balance, donations, expenses, auction details, and closing balance for the year, intended to
+  be posted to the committee's WhatsApp group once the festival wraps up. Expected/pending
+  amounts are deliberately left out of this report, since they're not relevant once the season
+  is over.
+
+### 2.11 WhatsApp Sharing
 
 Configurable message templates (**Settings → WhatsApp Templates**) with placeholders and a live
 preview — after saving a donation, one tap copies a ready-to-paste WhatsApp acknowledgment to
 the clipboard.
 
-### 2.10 PDF & PNG Export
+### 2.12 PDF & PNG Export
 
 Every list page (Donations, Expenses, Auctions) and the Dashboard can export to PDF or PNG:
 
@@ -170,20 +209,20 @@ Every list page (Donations, Expenses, Auctions) and the Dashboard can export to 
   which stays readable even with a large number of transactions instead of producing one very
   tall image.
 
-### 2.11 Configurable Categories & Units
+### 2.13 Configurable Categories & Units
 
 Categories and units used by historical records are **deactivated** rather than deleted when
 removed from Settings, so a past record never silently loses or changes its original label.
 Defaults can always be restored if accidentally removed.
 
-### 2.12 Offline-First & Mobile-First
+### 2.14 Offline-First & Mobile-First
 
 - Installable **PWA** — everyday work (adding/editing/viewing/reporting) works with no internet
   connection.
 - Card-based lists on phones, full tables on larger screens; bottom navigation on mobile, a
   sidebar on desktop.
 
-### 2.13 Row Action Icons & Display Mode
+### 2.15 Row Action Icons & Display Mode
 
 Every row action — Edit, Delete, Duplicate, Copy WhatsApp, Move to Expenses, Convert to
 Donation, Move back to Expected, Mark Done, Rename — can show as an icon, as text, or both.
@@ -191,14 +230,14 @@ Donation, Move back to Expected, Mark Done, Rename — can show as an icon, as t
 everywhere at once; it defaults to Text only, matching the app's original look, so nothing
 changes until you opt in.
 
-### 2.14 Duplicate Entries
+### 2.16 Duplicate Entries
 
 Donations, Expenses, and Auctions (Actual and Expected alike) can be **Duplicated** — this opens
 the same Add-style form pre-filled with the source record's values and today's date, so you can
 review and adjust anything (amount, donor, date) before it's saved as a brand-new record. The
 original is never touched. Useful for near-identical repeat entries within the same season.
 
-### 2.15 Dark Theme
+### 2.17 Dark Theme
 
 **Settings → Appearance** also has a System / Light / Dark switch. "System" (the default) follows
 your phone or browser's own light/dark setting automatically and updates live if you change it
@@ -432,8 +471,8 @@ Profiles existed as a feature.
 ### 8.1 What travels in a backup
 
 Everything scoped to a specific year travels with it: Donations, Expected Donations, Expenses,
-Expected Expenses, Auctions, Tasks (with their checklists), Key Events, and Pooja Roster
-entries. Cross-year settings (Categories, Units, People & Vendors) travel once per backup file,
+Expected Expenses, Auctions, Tasks (with their checklists), Key Events, Pooja Roster entries, and
+Inventory Items. Cross-year settings (Categories, Units, People & Vendors) travel once per backup file,
 not per year. A few things are deliberately device-local and never included in a backup, since
 restoring someone else's data shouldn't overwrite them: the Google Drive backup reminder
 schedule/history, the local backup on launch setting (§8.4) and the folder it's pointed at, and
@@ -482,14 +521,14 @@ indicator either way.
 
 ## 9. Data Architecture
 
-A single IndexedDB database (Dexie schema version 5) holds every year. Records are scoped by
+A single IndexedDB database (Dexie schema version 6) holds every year. Records are scoped by
 `yearProfileId`, so switching years is just a query filter — not a restore operation. See
 `src/types/index.ts` for the full schema and `src/db/db.ts` for the Dexie table/index
 definitions and version-upgrade history.
 
 **Year-scoped entities** (one set per `YearProfile`): `Donation`, `ExpectedDonation`, `Expense`,
 `ExpectedExpense`, `Auction`, `Task` (with embedded `TaskChecklistItem[]`), `KeyEvent`,
-`PoojaAssignment`.
+`PoojaAssignment`, `InventoryItem`.
 
 **Cross-year entities**: `YearProfile` itself, `Category`, `Unit`, `Profile` (the People &
 Vendors registry), `AppSettings`, `LocalBackupHandleRecord` (the picked local-backup folder

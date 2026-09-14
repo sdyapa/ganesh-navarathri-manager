@@ -109,7 +109,7 @@ one installment of a still-partial pledge, back to `status: 'partially-paid'` in
 calls instead of exactly 1** — a donor or auction winner paying a pledge in installments rather
 than all at once. Each call: (1) creates a real `Donation` for the installment amount via the
 same `insertDonation` path a one-shot conversion uses (so it's auditable and hits the actual
-balance immediately — see §2.10's "Hard rules"), (2) appends that Donation's id to the pledge's
+balance immediately — see §2.11's "Hard rules"), (2) appends that Donation's id to the pledge's
 `installmentDonationIds` array, (3) sums those installments' actual amounts via
 `sumDonationAmounts` to get the running total collected, and (4) sets `status` to `'converted'`
 (with `convertedDonationId` pointing at the *final* installment — same semantics as a one-shot
@@ -200,7 +200,7 @@ in (`donations`, `expectedDonations`, `auctions.person`, `expenses.vendorName`,
 (id)` — historical records keep whatever name they already have, which is fine precisely because
 there's no FK to break.
 
-**Backup import auto-registration** — see §2.9 below; this is where the bug fixed on
+**Backup import auto-registration** — see §2.10 below; this is where the bug fixed on
 2026-08-31 lived (replace-all mode's `db.profiles.bulkAdd` only seeded whatever was *explicit*
 in the backup, unlike every other import mode).
 
@@ -208,23 +208,26 @@ in the backup, unlike every other import mode).
 
 | Layer | File(s) |
 |---|---|
-| Service | `services/copyForwardService.ts` — `copyExpensesToExpected`, `copyDonationsToExpected`, `copyTasksToYear` |
-| Component | `components/common/CopyToYearModal.tsx` (shared year-picker; exports `NEXT_YEAR_VALUE`; optional `description` prop overrides the default "...as pending Expected records..." body copy for callers like Tasks where that wording doesn't apply) |
-| DataTable support | `components/common/DataTable.tsx`'s optional `selection` prop (checkboxes) — Tasks uses its own lighter-weight `selectedIds`/`toggleSelected` state directly on the card list instead, since it isn't `DataTable`-based |
-| Pages | `ExpensesPage.tsx` / `DonationsPage.tsx` — `selectedIds` state, `toggleSelected`/`toggleSelectAllOnPage`, "Copy N to Expected …" button. `TasksPage.tsx` — same `selectedIds` pattern, "Copy N tasks to Next Year" button |
+| Service | `services/copyForwardService.ts` — `copyExpensesToExpected`, `copyDonationsToExpected`, `copyTasksToYear`, `copyInventoryItemsToYear` |
+| Component | `components/common/CopyToYearModal.tsx` (shared year-picker; exports `NEXT_YEAR_VALUE`; optional `description` prop overrides the default "...as pending Expected records..." body copy for callers like Tasks/Inventory where that wording doesn't apply) |
+| DataTable support | `components/common/DataTable.tsx`'s optional `selection` prop (checkboxes) — Tasks/Inventory use their own lighter-weight `selectedIds`/`toggleSelected` state directly on the card list instead, since neither is `DataTable`-based |
+| Pages | `ExpensesPage.tsx` / `DonationsPage.tsx` — `selectedIds` state, `toggleSelected`/`toggleSelectAllOnPage`, "Copy N to Expected …" button. `TasksPage.tsx` / `InventoryPage.tsx` — same `selectedIds` pattern, "Copy N … to Next Year" button |
 | Tests | `describe('copy Actual records forward to Expected (recurring items)')` in `integration.test.ts` |
 
 Each function takes an array of source-record ids and a `targetYearId`, reads each source record
-(`getExpense`/`getDonation`/`getTask`), and inserts a **freshly built record** in the target year
-— the source record itself is never touched. `copyExpensesToExpected`/`copyDonationsToExpected`
-default the copy's date to today (the amount is what matters; the user retypes the real date once
-known). `copyTasksToYear` instead shifts the task's `dueDate` by the exact year gap via
-`addYears()` (`lib/date.ts`) — a due date is meaningful on its own, so a recurring task like "Book
-priest" should land on the same festival day next year automatically rather than resetting to
-today or requiring the date to be re-picked by hand — and copies checklist items across reset to
-unchecked (a copy is a new occurrence, not a continuation of last year's progress). `NEXT_YEAR_VALUE`
-is a sentinel the modal uses so "copy into next year" can offer a not-yet-created year as an
-option; the page resolves it via `getOrCreateNextYearProfile` only once the user actually confirms.
+(`getExpense`/`getDonation`/`getTask`/`getInventoryItem`), and inserts a **freshly built record**
+in the target year — the source record itself is never touched. `copyExpensesToExpected`/
+`copyDonationsToExpected` default the copy's date to today (the amount is what matters; the user
+retypes the real date once known). `copyTasksToYear` instead shifts the task's `dueDate` by the
+exact year gap via `addYears()` (`lib/date.ts`) — a due date is meaningful on its own, so a
+recurring task like "Book priest" should land on the same festival day next year automatically
+rather than resetting to today or requiring the date to be re-picked by hand — and copies
+checklist items across reset to unchecked (a copy is a new occurrence, not a continuation of last
+year's progress). `copyInventoryItemsToYear` is the odd one out — see §2.9 for why it's a
+reconciliation checklist (only `'stored'` items eligible, resets to `'stored'` in the target
+year) rather than a plain recurring-record copy like the other three. `NEXT_YEAR_VALUE` is a
+sentinel the modal uses so "copy into next year" can offer a not-yet-created year as an option;
+the page resolves it via `getOrCreateNextYearProfile` only once the user actually confirms.
 
 ### 2.7 Tasks
 
@@ -279,7 +282,47 @@ helper before sorting: `KeyEventsSection` on `[e.name, e.notes]`, `PoojaRosterSe
 `[a.familyNames, a.notes]`. The empty-state message distinguishes "no entries at all" from "no
 entries match this search" so a stale-looking empty list doesn't read as data loss.
 
-### 2.9 Backup Export / Import / Reset
+### 2.9 Inventory (Equipment Tracking)
+
+| Layer | File(s) |
+|---|---|
+| Types | `InventoryItem`, `InventoryItemStatus` in `types/index.ts` |
+| Dexie table | `inventoryItems: 'id, yearProfileId, status, keptWith'` (added in `db.ts` v6) |
+| Repository | `db/repositories/inventoryItems.ts` — `insertInventoryItem`, `getInventoryItem`, `getInventoryItemsByIds` (batched, for resolving a carried item's source year), `updateInventoryItem`, `deleteInventoryItem`, `markInventoryItemReturned`/`markInventoryItemStored` (toggle, mirrors `setTaskDone`) |
+| Service | `services/copyForwardService.ts` — `copyInventoryItemsToYear` |
+| Hook | `hooks/useYearData.ts` → `useInventoryItems` |
+| Page | `pages/inventory/InventoryPage.tsx`, `pages/inventory/InventoryForm.tsx` |
+| Validation | `inventoryItemInputSchema` in `lib/validation.ts` |
+| Tests | `describe('Inventory tracking')` |
+
+The newest year-scoped entity — brand new in this app, no prior code to reconcile with. Follows
+the same 10-step "Adding a new year-scoped entity" checklist as §2.10 below word for word (Task
+was the closest structural analog: a few flat fields, no cross-record relationships beyond the
+`keptWith` free-text field, which reuses the `Profile` registry — `kind: 'person'` — exactly the
+way Donor/Auction-participant names do, via `upsertProfileFromName` called from both `insert` and
+`update`, per the Conventions Checklist's explicit guidance in §5).
+
+**Copy-forward is a reconciliation checklist, not a blind duplicate** — this is the one place
+Inventory's copy-forward behavior differs from every other entity's (`copyExpensesToExpected`,
+`copyDonationsToExpected`, `copyTasksToYear` in §2.6): those exist to save re-typing a *recurring*
+record; `copyInventoryItemsToYear` exists to carry forward *only what's still unresolved* so it
+can be explicitly checked off. Concretely:
+- Only items with `status === 'stored'` are ever eligible — `copyInventoryItemsToYear` silently
+  skips anything not `'stored'` if passed in, and `InventoryPage.tsx` only renders the selection
+  checkbox on `'stored'` cards in the first place, so the UI and service layer agree on
+  eligibility independently.
+- The copy resets to `status: 'stored'`, `storedDate: todayDateOnly()` in the target year (the
+  original storage date doesn't matter for reconciliation — what matters is "still unresolved as
+  of this new season") and sets `sourceInventoryItemId` back to the original.
+- The **source item is never touched** by copying — no "converted"/"archived" flag flips on it.
+  A user marks the *old* year's item returned separately if the physical item genuinely came back
+  before the new season started; copying forward is specifically for the case where it hadn't.
+- `InventoryPage.tsx`'s `useSourceYearNames` hook resolves each carried item's "Carried from
+  {year}" label via a single batched `getInventoryItemsByIds` call (not one lookup per card) —
+  a source item's own `yearProfileId` isn't derivable from its id alone, so this is a real fetch,
+  memoized on the joined list of `sourceInventoryItemId`s currently on screen.
+
+### 2.10 Backup Export / Import / Reset
 
 This is the most cross-cutting piece of the codebase — touching it means touching four files
 together. Get familiar with `backupImport.ts` before changing any record type.
@@ -318,8 +361,8 @@ place to introduce a bug when adding a new record type (see the incident note be
 > `'registers profiles from a backup with NO explicit profiles list even under "replace entire
 > database" mode'`.
 
-**Adding a new year-scoped entity** (the pattern Tasks/KeyEvents/PoojaAssignments followed, and
-what any future one must repeat) means touching, in order:
+**Adding a new year-scoped entity** (the pattern Tasks/KeyEvents/PoojaAssignments/InventoryItem
+followed, and what any future one must repeat) means touching, in order:
 
 1. `types/index.ts` — the record type, and add its array to `YearProfileBundle`.
 2. `db/db.ts` — a new table in a **new** Dexie `.version(n)` block (never edit an old version
@@ -374,7 +417,7 @@ the identical `inspectAndStage()` helper in `pages/settings/DataManagement.tsx`.
 older "paste one exact file link" flow available for a file outside the auto-detected `backups/`
 convention, or a repo where browsing isn't wanted.
 
-### 2.10 Dashboard, Reports & the Financial Calculation Engine
+### 2.11 Dashboard, Reports & the Financial Calculation Engine
 
 | Layer | File(s) |
 |---|---|
@@ -414,7 +457,7 @@ still coloring the number red. Deliberately plain SVG + trigonometry (`polarToCa
 `arcPath` in `BalanceGauge.tsx`), not a chart library — this is one static shape, not worth
 pulling `chart.js` (already lazy-loaded, and only for the Reports page) in for. Zone/needle
 colors are hardcoded hex values, not `var(--color-*)` tokens, for the same reason every other
-export-relevant visual in this app avoids theme tokens (see §2.16's theme gotchas) — the gauge
+export-relevant visual in this app avoids theme tokens (see §2.17's theme gotchas) — the gauge
 needs to look identical in a PNG export regardless of the active theme, and `exportElementAsPng`
 (Dashboard's existing PNG export) captures it as part of the live DOM with no special-casing
 needed.
@@ -428,9 +471,9 @@ const upcomingTasks = useMemo(() => {
 }, [tasks, taskPreviewCount])
 ```
 Reuses `useTasks(currentYearId)` (`hooks/useYearData.ts`) and the same `sortByKey` helper every
-list page's sort control already uses (§2.13) — no new sorting logic. `taskPreviewCount` comes
+list page's sort control already uses (§2.14) — no new sorting logic. `taskPreviewCount` comes
 from `AppSettings.dashboardTaskPreviewCount` (default `3`, portable — travels in backups exactly
-like `actionDisplayMode`/`themePreference`, see §2.9's incident note for why every new
+like `actionDisplayMode`/`themePreference`, see §2.10's incident note for why every new
 `AppSettings` field needs the same three touch points: `db/defaults.ts`'s default constant,
 `withAppSettingsDefaults`'s backfill, and the backup export/import/validation trio). Setting it
 to `0` hides the section entirely (`taskPreviewCount > 0 && upcomingTasks.length > 0` guards the
@@ -440,7 +483,7 @@ synced from the field alone, not the whole settings object" pattern for a free-t
 input (see that file's own comment for why depending on the whole object would clobber an
 unsaved keystroke the moment any other setting on the page saves).
 
-### 2.11 WhatsApp Sharing
+### 2.12 WhatsApp Sharing
 
 | Layer | File(s) |
 |---|---|
@@ -449,7 +492,7 @@ unsaved keystroke the moment any other setting on the page saves).
 | Hook | `hooks/useWhatsAppShare.ts` — `buildMessage`/`shareDonation` (copies to clipboard via `lib/clipboard.ts`) |
 | Tests | `test/whatsapp.test.ts` |
 
-### 2.12 PDF & PNG Export
+### 2.13 PDF & PNG Export
 
 | Layer | File(s) |
 |---|---|
@@ -470,7 +513,7 @@ the on-screen visual (charts, stat cards) genuinely is what you want captured.
 render the ₹ glyph — PDF call sites pass `formatCurrencyForPdf` (a "Rs." prefix fallback); PNG
 call sites render real DOM/canvas text with no such limitation, so they pass `formatCurrency`.
 
-### 2.13 Configurable Categories, Units & Sorting
+### 2.14 Configurable Categories, Units & Sorting
 
 | Layer | File(s) |
 |---|---|
@@ -500,7 +543,7 @@ reused by every page rather than each page writing its own comparator.
 > tiebreak in both directions. See `test/tableUtils.test.ts`'s regression test for the exact
 > before/after case. Don't reintroduce a sort-ascending-then-`.reverse()` pattern anywhere new.
 
-### 2.14 Row Action Icons & Display Mode
+### 2.15 Row Action Icons & Display Mode
 
 | Layer | File(s) |
 |---|---|
@@ -518,7 +561,7 @@ beyond the rendering mode. `.link-button`'s CSS gained a `display:inline-flex;ga
 for text-only) and a `.link-button--icon-only` modifier (drops the underline, which looks wrong
 on an emoji).
 
-### 2.15 Duplicate Entries
+### 2.16 Duplicate Entries
 
 | Layer | File(s) |
 |---|---|
@@ -533,7 +576,7 @@ reviewable, pre-filled form rather than inserting silently — the same conventi
 record-creating flow in this app follows (Convert, Move, the Auction pledge, Copy-to-Expected).
 Scoped to Donations/Expenses/Auctions only; Tasks/Calendar don't have a Duplicate action.
 
-### 2.16 Dark Theme
+### 2.17 Dark Theme
 
 | Layer | File(s) |
 |---|---|
@@ -541,7 +584,7 @@ Scoped to Donations/Expenses/Auctions only; Tasks/Calendar don't have a Duplicat
 | Hook | `hooks/useTheme.ts` → `useEffectiveTheme()` — resolves `'system'` against `window.matchMedia('(prefers-color-scheme: dark)')` live (a `change` listener, not a one-time read) |
 | Applier | `components/layout/ThemeApplier.tsx` — renders nothing, just keeps `document.documentElement.dataset.theme` in sync via `useEffect`; mounted once near the root in `App.tsx` |
 | CSS | `styles/global.css` — color tokens live under `:root, [data-theme="light"] { --color-*: ...; }` with a parallel `[data-theme="dark"] { --color-*: ...; }` override block |
-| Settings | `pages/settings/AppearanceSettings.tsx` (same page as §2.14) |
+| Settings | `pages/settings/AppearanceSettings.tsx` (same page as §2.15) |
 
 **Why `:root, [data-theme="light"]`, not just `:root`**: `[data-theme="light"]` lets a
 *descendant* element re-assert light values even when an ancestor (`<html>`) has
@@ -590,7 +633,7 @@ confirming the row text is legible dark-on-white, not near-invisible):
   `data-theme="light"` **and** an explicit `color` override on the captured element/container
   (see gotcha #3 above), restoring the original values in a `finally` block afterward.
 
-### 2.17 Local Backup on Launch
+### 2.18 Local Backup on Launch
 
 | Layer | File(s) |
 |---|---|
@@ -610,7 +653,7 @@ but has no business flowing through that JSON path, so it lives in its own tiny 
 instead — `localBackupHandle.ts` is the only place that ever reads or writes it.
 
 **Per-device, not portable** — `localBackup` follows the exact same pattern as
-`driveBackupReminder` (§2.9's sibling concept): excluded from `buildSettingsBlock()`'s picked
+`driveBackupReminder` (§2.10's sibling concept): excluded from `buildSettingsBlock()`'s picked
 `appSettings` fields in `backupExport.ts`, and preserved as `currentSettings.localBackup` in
 `backupImport.ts`'s `replace-all` path rather than ever being overwritten by an imported backup.
 A picked folder handle and this device's own backup history aren't data to carry into a restore.
@@ -774,7 +817,7 @@ profile and with each other in shared assertions, not because the year number it
 - New Dexie table or a new **indexed** field → bump the Dexie version in `db/db.ts` with a new
   `.version(n)` block (never edit a shipped version block). A new *plain, unindexed* field on an
   existing table does **not** need a version bump.
-- New year-scoped entity → follow the 10-step checklist in §2.9 exactly, in order. Steps 6
+- New year-scoped entity → follow the 10-step checklist in §2.10 exactly, in order. Steps 6
   (`replace-all`'s derivation) and 7 (reset) are the two most commonly missed.
 - New optional field with a "reports/exports must never see this" requirement (like Payment
   Group) → don't reference it in `calculations.ts`, `reportBuilders.ts`, `pdf.ts`, or `png.ts`,
