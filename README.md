@@ -96,8 +96,10 @@ Participant, and Vendor field:
 A simple TODO list for festival prep, per year, at **Tasks**:
 
 - Each task has a title, a due date, optional notes, and can be marked **Pending**/**Done**.
-- The list is sorted by due date (soonest first by default) with a sort control and a
-  Pending/Done filter.
+- The list is sorted by due date (soonest first by default) with a sort control, a Pending/Done
+  filter, and a search box — search matches a task's title, notes, **and** its checklist item
+  labels, so searching "flowers" finds a task with a "Flowers" checklist item even if the task's
+  own title doesn't mention it.
 - A task can carry its own **checklist** — e.g. a "Buy pooja items" task with a checklist of
   "Flowers", "Coconuts", "Camphor" — checked off individually as they're bought. Checklist items
   can be added at creation (one per line) or any time afterward from the task itself, and
@@ -119,6 +121,9 @@ A festival calendar, per year, at **Calendar**, with two views:
 - **Pooja Roster** — a day-by-day log of which family (or families) performed pooja, from the
   start of the festival up to immersion day. One entry per day, with one or more family names
   (comma-separated) and optional notes.
+
+Both sections have a search box (matching name/family-names and notes) once there's more than a
+couple of entries to scroll through.
 
 ### 2.8 Dashboard & Reports
 

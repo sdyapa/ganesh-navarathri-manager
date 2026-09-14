@@ -217,6 +217,12 @@ editing a task never touches its checklist; that's managed live from the task ca
 
 Tasks can also be copied forward to another year — see §2.6 above (`copyTasksToYear`).
 
+**Search includes checklist item labels** — `TasksPage.tsx`'s `filtered` memo calls
+`matchesSearch([t.title, t.notes, ...t.checklist.map((c) => c.label)], search)` (`lib/tableUtils.ts`).
+`matchesSearch` itself needed no change — it already accepts a flat `Array<string | undefined>`,
+so checklist labels are simply spread into the haystack alongside the task's own fields. This was
+the one list page missing a `SearchInput` at all until this feature.
+
 ### 2.8 Festival Calendar (Key Events & Pooja Roster)
 
 | Layer | File(s) |
@@ -234,6 +240,14 @@ inline add-row + inline per-item edit toggle (same idea as `ProfileSettings.tsx`
 since each record is only 2–3 fields. `PoojaAssignment.familyNames` is one free-text field
 (comma-separated), not a multi-select against the Profile registry — a deliberate simplicity
 tradeoff (see README §10, Known Limitations).
+
+**Search**: both sections had zero filter/search UI until this feature — they now each carry
+their own local `search` state and a bare `<input type="search">` above the list (not the full
+`FilterBar`/`SearchInput` combo the heavier list pages use, since these sections never adopted
+`FilterBar`'s styling to begin with), filtering their `sorted` memo via the same `matchesSearch`
+helper before sorting: `KeyEventsSection` on `[e.name, e.notes]`, `PoojaRosterSection` on
+`[a.familyNames, a.notes]`. The empty-state message distinguishes "no entries at all" from "no
+entries match this search" so a stale-looking empty list doesn't read as data loss.
 
 ### 2.9 Backup Export / Import / Reset
 
