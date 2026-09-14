@@ -453,6 +453,7 @@ export function DataManagement() {
               { label: 'Tasks', value: String(inspection.summary.totals.tasks) },
               { label: 'Key Events', value: String(inspection.summary.totals.keyEvents) },
               { label: 'Pooja Roster Entries', value: String(inspection.summary.totals.poojaAssignments) },
+              { label: 'Inventory Items', value: String(inspection.summary.totals.inventoryItems) },
               { label: 'Categories Included', value: String(inspection.summary.categoryCount) },
               { label: 'Units Included', value: String(inspection.summary.unitCount) },
               { label: 'People/Vendors Included', value: String(inspection.summary.profileCount) },
@@ -527,6 +528,7 @@ export function DataManagement() {
                 { label: 'Tasks', value: String(resetImpact.tasks) },
                 { label: 'Key Events', value: String(resetImpact.keyEvents) },
                 { label: 'Pooja Roster Entries', value: String(resetImpact.poojaAssignments) },
+                { label: 'Inventory Items', value: String(resetImpact.inventoryItems) },
               ]}
             />
           }

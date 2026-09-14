@@ -13,23 +13,26 @@ import { listProfiles } from '@/db/repositories/profiles'
 import { listTasksForYear } from '@/db/repositories/tasks'
 import { listKeyEventsForYear } from '@/db/repositories/keyEvents'
 import { listPoojaAssignmentsForYear } from '@/db/repositories/poojaAssignments'
+import { listInventoryItemsForYear } from '@/db/repositories/inventoryItems'
 import { getAppSettings } from '@/db/repositories/settings'
 import { nowIso, formatFileTimestamp } from '@/lib/date'
 
 async function buildYearBundle(yearProfileId: string): Promise<YearProfileBundle> {
   const profile = await getYearProfile(yearProfileId)
   if (!profile) throw new Error('Year profile not found')
-  const [donations, expectedDonations, expenses, expectedExpenses, auctions, tasks, keyEvents, poojaAssignments] = await Promise.all([
-    listDonationsForYear(yearProfileId),
-    listExpectedDonationsForYear(yearProfileId),
-    listExpensesForYear(yearProfileId),
-    listExpectedExpensesForYear(yearProfileId),
-    listAuctionsForYear(yearProfileId),
-    listTasksForYear(yearProfileId),
-    listKeyEventsForYear(yearProfileId),
-    listPoojaAssignmentsForYear(yearProfileId),
-  ])
-  return { profile, donations, expectedDonations, expenses, expectedExpenses, auctions, tasks, keyEvents, poojaAssignments }
+  const [donations, expectedDonations, expenses, expectedExpenses, auctions, tasks, keyEvents, poojaAssignments, inventoryItems] =
+    await Promise.all([
+      listDonationsForYear(yearProfileId),
+      listExpectedDonationsForYear(yearProfileId),
+      listExpensesForYear(yearProfileId),
+      listExpectedExpensesForYear(yearProfileId),
+      listAuctionsForYear(yearProfileId),
+      listTasksForYear(yearProfileId),
+      listKeyEventsForYear(yearProfileId),
+      listPoojaAssignmentsForYear(yearProfileId),
+      listInventoryItemsForYear(yearProfileId),
+    ])
+  return { profile, donations, expectedDonations, expenses, expectedExpenses, auctions, tasks, keyEvents, poojaAssignments, inventoryItems }
 }
 
 async function buildSettingsBlock() {

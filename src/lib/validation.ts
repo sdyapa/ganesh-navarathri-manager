@@ -111,6 +111,16 @@ export const poojaAssignmentInputSchema = z.object({
 
 export type PoojaAssignmentInput = z.infer<typeof poojaAssignmentInputSchema>
 
+export const inventoryItemInputSchema = z.object({
+  itemName: nonEmpty('Item name'),
+  quantity: positiveQuantity.optional(),
+  keptWith: nonEmpty('Kept with'),
+  notes,
+  storedDate: dateOnly,
+})
+
+export type InventoryItemInput = z.infer<typeof inventoryItemInputSchema>
+
 export const categoryInputSchema = z.object({
   kind: z.enum(['donation', 'expense']),
   name: nonEmpty('Category name').max(60, 'Category name is too long'),
@@ -272,6 +282,23 @@ export const backupPoojaAssignmentSchema = z
   })
   .passthrough()
 
+export const backupInventoryItemSchema = z
+  .object({
+    id: z.string(),
+    yearProfileId: z.string(),
+    itemName: z.string(),
+    quantity: z.number().optional(),
+    keptWith: z.string(),
+    notes: z.string().optional(),
+    status: z.enum(['stored', 'returned']),
+    storedDate: z.string(),
+    returnedDate: z.string().nullable().optional(),
+    sourceInventoryItemId: z.string().nullable().optional(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+  })
+  .passthrough()
+
 export const backupYearProfileSchema = z
   .object({
     id: z.string(),
@@ -329,6 +356,7 @@ export const backupYearBundleSchema = z
     tasks: z.array(backupTaskSchema).default([]),
     keyEvents: z.array(backupKeyEventSchema).default([]),
     poojaAssignments: z.array(backupPoojaAssignmentSchema).default([]),
+    inventoryItems: z.array(backupInventoryItemSchema).default([]),
   })
   .passthrough()
 

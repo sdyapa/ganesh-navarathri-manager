@@ -11,6 +11,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/auctions', label: 'Auctions', icon: '🔨' },
   { to: '/tasks', label: 'Tasks', icon: '📝' },
   { to: '/calendar', label: 'Calendar', icon: '📅' },
+  { to: '/inventory', label: 'Inventory', icon: '📦' },
   { to: '/reports', label: 'Reports', icon: '📊' },
   { to: '/settings', label: 'Settings', icon: '⚙️' },
 ]

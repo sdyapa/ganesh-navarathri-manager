@@ -9,6 +9,7 @@ import { insertExpectedExpense } from '@/db/repositories/expectedExpenses'
 import { getDonation } from '@/db/repositories/donations'
 import { insertExpectedDonation } from '@/db/repositories/expectedDonations'
 import { getTask, insertTask } from '@/db/repositories/tasks'
+import { getInventoryItem, insertInventoryItem } from '@/db/repositories/inventoryItems'
 import { addYears, todayDateOnly } from '@/lib/date'
 
 export async function copyExpensesToExpected(expenseIds: string[], targetYearId: string): Promise<number> {
@@ -68,6 +69,38 @@ export async function copyTasksToYear(taskIds: string[], targetYearId: string, s
       notes: task.notes,
       checklistItems: task.checklist.map((item) => item.label),
     })
+    count += 1
+  }
+  return count
+}
+
+/** Copies still-`stored` Inventory items into a target year as a reconciliation checklist, not
+ *  a blind duplicate — the point is to carry forward only what's still outstanding so it can be
+ *  explicitly checked off ("Mark Returned") once the physical item actually comes back, making
+ *  anything left unchecked by the new season's end a visible "not yet returned / possibly lost"
+ *  list. Only `'stored'` items should ever be passed in here (the page enforces this by only
+ *  showing the selection checkbox on `'stored'` cards) — a `'returned'` item has nothing left to
+ *  reconcile. The copy resets to `status: 'stored'` and `storedDate: todayDateOnly()` in the new
+ *  year (the item's original storage date doesn't matter for reconciliation purposes — what
+ *  matters is "still not returned as of this season") and tags `sourceInventoryItemId` so the
+ *  new card can show "Carried from {source year}". The source item in the old year is left
+ *  completely untouched — copying never marks it returned. */
+export async function copyInventoryItemsToYear(itemIds: string[], targetYearId: string): Promise<number> {
+  let count = 0
+  for (const id of itemIds) {
+    const item = await getInventoryItem(id)
+    if (!item || item.status !== 'stored') continue
+    await insertInventoryItem(
+      targetYearId,
+      {
+        itemName: item.itemName,
+        quantity: item.quantity,
+        keptWith: item.keptWith,
+        notes: item.notes,
+        storedDate: todayDateOnly(),
+      },
+      id,
+    )
     count += 1
   }
   return count

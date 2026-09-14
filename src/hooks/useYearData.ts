@@ -68,6 +68,14 @@ export function usePoojaAssignments(yearProfileId: string | undefined) {
   )
 }
 
+export function useInventoryItems(yearProfileId: string | undefined) {
+  return useLiveQuery(
+    () => (yearProfileId ? db.inventoryItems.where('yearProfileId').equals(yearProfileId).toArray() : []),
+    [yearProfileId],
+    undefined,
+  )
+}
+
 export function useCategories(kind?: 'donation' | 'expense') {
   return useLiveQuery(async () => {
     const all = await db.categories.toArray()

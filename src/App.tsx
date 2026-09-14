@@ -12,6 +12,7 @@ import { ExpectedExpensesPage } from '@/pages/expenses/ExpectedExpensesPage'
 import { AuctionsPage } from '@/pages/auctions/AuctionsPage'
 import { TasksPage } from '@/pages/tasks/TasksPage'
 import { CalendarPage } from '@/pages/calendar/CalendarPage'
+import { InventoryPage } from '@/pages/inventory/InventoryPage'
 import { SettingsPage } from '@/pages/settings/SettingsPage'
 
 // Reports is the only screen that needs Chart.js, which is large — loading it lazily keeps
@@ -39,6 +40,7 @@ export function App() {
               <Route path="/auctions" element={<AuctionsPage />} />
               <Route path="/tasks" element={<TasksPage />} />
               <Route path="/calendar" element={<CalendarPage />} />
+              <Route path="/inventory" element={<InventoryPage />} />
               <Route
                 path="/reports"
                 element={

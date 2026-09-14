@@ -7,6 +7,7 @@ import type {
   ExpectedDonation,
   ExpectedExpense,
   Expense,
+  InventoryItem,
   KeyEvent,
   LocalBackupHandleRecord,
   PoojaAssignment,
@@ -35,6 +36,7 @@ export class AppDatabase extends Dexie {
   poojaAssignments!: Table<PoojaAssignment, string>
   appSettings!: Table<AppSettings, string>
   localBackupHandle!: Table<LocalBackupHandleRecord, string>
+  inventoryItems!: Table<InventoryItem, string>
 
   constructor() {
     super('ganesh-navarathri-manager')
@@ -75,6 +77,11 @@ export class AppDatabase extends Dexie {
     // out of the appSettings document itself (see LocalBackupHandleRecord's doc comment).
     this.version(5).stores({
       localBackupHandle: 'id',
+    })
+    // v6: Inventory/asset tracking (speaker, amplifier, carpets, lights, etc. kept at committee
+    // members' homes between festivals) — one new table, same precedent as v3/v5.
+    this.version(6).stores({
+      inventoryItems: 'id, yearProfileId, status, keptWith',
     })
   }
 }

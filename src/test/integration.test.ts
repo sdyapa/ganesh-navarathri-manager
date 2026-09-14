@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { db } from '@/db/db'
-import { resetApplication } from '@/services/resetService'
+import { resetApplication, getResetImpact } from '@/services/resetService'
 import {
   createYearProfile,
   getYearClosingBalance,
@@ -35,7 +35,21 @@ import {
 } from '@/db/repositories/categories'
 import { listUnits, setUnitActive, deleteUnit, isUnitInUse, restoreDefaultUnits } from '@/db/repositories/units'
 import { listProfiles, renameProfile, reorderProfiles, deleteProfile } from '@/db/repositories/profiles'
-import { copyExpensesToExpected, copyDonationsToExpected, copyTasksToYear } from '@/services/copyForwardService'
+import {
+  copyExpensesToExpected,
+  copyDonationsToExpected,
+  copyTasksToYear,
+  copyInventoryItemsToYear,
+} from '@/services/copyForwardService'
+import {
+  insertInventoryItem,
+  getInventoryItem,
+  listInventoryItemsForYear,
+  updateInventoryItem,
+  deleteInventoryItem,
+  markInventoryItemReturned,
+  markInventoryItemStored,
+} from '@/db/repositories/inventoryItems'
 import { exportYearBackup, exportFullBackup } from '@/services/backupExport'
 import { applyBackupImport, inspectBackupFile } from '@/services/backupImport'
 import {
@@ -986,6 +1000,142 @@ describe('festival calendar (Key Events + Pooja Roster)', () => {
     expect(matches(entry, 'reddy')).toBe(true)
     expect(matches(entry, 'morning')).toBe(true) // notes match
     expect(matches(entry, 'gupta')).toBe(false)
+  })
+})
+
+describe('Inventory tracking', () => {
+  it('inserts, lists, updates, marks returned/stored, and deletes an inventory item, registering keptWith as a Profile', async () => {
+    const year = await createYearProfile({ year: 3140, name: 'GN 3140', carryForward: false })
+
+    const item = await insertInventoryItem(year.id, {
+      itemName: 'Speaker',
+      quantity: 2,
+      keptWith: 'Ramesh Kumar',
+      notes: 'Two large speakers',
+      storedDate: '3140-09-20',
+    })
+    expect(item.status).toBe('stored')
+    expect(item.returnedDate).toBeNull()
+
+    const people = await listProfiles('person')
+    expect(people.some((p) => p.name === 'Ramesh Kumar')).toBe(true)
+
+    let listed = await listInventoryItemsForYear(year.id)
+    expect(listed).toHaveLength(1)
+
+    await updateInventoryItem(item.id, {
+      itemName: 'Speaker (large)',
+      quantity: 2,
+      keptWith: 'Ramesh Kumar',
+      notes: 'Two large speakers',
+      storedDate: '3140-09-20',
+    })
+    expect((await getInventoryItem(item.id))?.itemName).toBe('Speaker (large)')
+
+    await markInventoryItemReturned(item.id)
+    let updated = await getInventoryItem(item.id)
+    expect(updated?.status).toBe('returned')
+    expect(updated?.returnedDate).not.toBeNull()
+
+    await markInventoryItemStored(item.id)
+    updated = await getInventoryItem(item.id)
+    expect(updated?.status).toBe('stored')
+    expect(updated?.returnedDate).toBeNull()
+
+    await deleteInventoryItem(item.id)
+    listed = await listInventoryItemsForYear(year.id)
+    expect(listed).toHaveLength(0)
+  })
+
+  it('copies only still-stored items into a target year as a reconciliation checklist, leaving the source untouched and excluding already-returned items', async () => {
+    const sourceYear = await createYearProfile({ year: 3141, name: 'GN 3141', carryForward: false })
+    const targetYear = await createYearProfile({ year: 3142, name: 'GN 3142', carryForward: false })
+
+    const stillOut = await insertInventoryItem(sourceYear.id, {
+      itemName: 'Amplifier',
+      keptWith: 'Suresh',
+      storedDate: '3141-09-15',
+    })
+    const alreadyReturned = await insertInventoryItem(sourceYear.id, {
+      itemName: 'Carpets',
+      keptWith: 'Ganesh',
+      storedDate: '3141-09-10',
+    })
+    await markInventoryItemReturned(alreadyReturned.id)
+
+    const count = await copyInventoryItemsToYear([stillOut.id, alreadyReturned.id], targetYear.id)
+    expect(count).toBe(1) // the returned item is silently skipped, not copied
+
+    const targetItems = await listInventoryItemsForYear(targetYear.id)
+    expect(targetItems).toHaveLength(1)
+    expect(targetItems[0].itemName).toBe('Amplifier')
+    expect(targetItems[0].keptWith).toBe('Suresh')
+    expect(targetItems[0].status).toBe('stored') // fresh, not pre-marked returned
+    expect(targetItems[0].sourceInventoryItemId).toBe(stillOut.id)
+
+    // Source items in the old year are completely untouched by copying.
+    const sourceItems = await listInventoryItemsForYear(sourceYear.id)
+    expect(sourceItems.find((i) => i.id === stillOut.id)?.status).toBe('stored')
+    expect(sourceItems.find((i) => i.id === alreadyReturned.id)?.status).toBe('returned')
+  })
+
+  it('round-trips inventory items through a full backup export/import, and an old backup with no inventoryItems field still validates', async () => {
+    const year = await createYearProfile({ year: 3143, name: 'GN 3143', carryForward: false })
+    await insertInventoryItem(year.id, { itemName: 'Lights', keptWith: 'Priya', storedDate: '3143-09-20' })
+
+    const backup = await exportFullBackup()
+    const bundle = backup.years.find((y) => y.profile.id === year.id)!
+    expect(bundle.inventoryItems).toHaveLength(1)
+
+    await resetApplication()
+    const inspection = await inspectBackupFile(backup)
+    expect(inspection.valid).toBe(true)
+    if (!inspection.valid) return
+    const result = await applyBackupImport(inspection.backup, 'add-new')
+    expect(result.inserted.inventoryItems).toBe(1)
+
+    const restoredYear = (await listYearProfiles()).find((y) => y.year === 3143)!
+    expect((await listInventoryItemsForYear(restoredYear.id))[0].itemName).toBe('Lights')
+
+    // Pre-feature backup (no inventoryItems key at all) must still validate.
+    const stripped = {
+      ...backup,
+      years: backup.years.map((y) => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { inventoryItems, ...rest } = y
+        return rest
+      }),
+    }
+    const strippedInspection = await inspectBackupFile(stripped)
+    expect(strippedInspection.valid).toBe(true)
+  })
+
+  it('search matches inventory items by item name, kept-with, or notes', async () => {
+    const year = await createYearProfile({ year: 3144, name: 'GN 3144', carryForward: false })
+    const speaker = await insertInventoryItem(year.id, { itemName: 'Speaker', keptWith: 'Ramesh', storedDate: '3144-09-20', notes: 'Heavy, needs two people' })
+
+    function matches(item: typeof speaker, query: string) {
+      return matchesSearch([item.itemName, item.keptWith, item.notes], query)
+    }
+
+    expect(matches(speaker, 'speaker')).toBe(true)
+    expect(matches(speaker, 'ramesh')).toBe(true)
+    expect(matches(speaker, 'heavy')).toBe(true) // notes match
+    expect(matches(speaker, 'amplifier')).toBe(false)
+  })
+
+  it('is cleared by resetApplication and counted by getResetImpact', async () => {
+    const year = await createYearProfile({ year: 3145, name: 'GN 3145', carryForward: false })
+    await insertInventoryItem(year.id, { itemName: 'Leftover speaker', keptWith: 'Someone', storedDate: '3145-09-20' })
+
+    const impact = await getResetImpact()
+    expect(impact.inventoryItems).toBe(1)
+
+    await resetApplication()
+    const allYears = await listYearProfiles()
+    for (const y of allYears) {
+      expect(await listInventoryItemsForYear(y.id)).toHaveLength(0)
+    }
   })
 })
 

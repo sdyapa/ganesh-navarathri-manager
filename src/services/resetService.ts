@@ -12,10 +12,11 @@ export interface ResetImpact {
   tasks: number
   keyEvents: number
   poojaAssignments: number
+  inventoryItems: number
 }
 
 export async function getResetImpact(): Promise<ResetImpact> {
-  const [years, donations, expectedDonations, expenses, expectedExpenses, auctions, tasks, keyEvents, poojaAssignments] =
+  const [years, donations, expectedDonations, expenses, expectedExpenses, auctions, tasks, keyEvents, poojaAssignments, inventoryItems] =
     await Promise.all([
       db.yearProfiles.count(),
       db.donations.count(),
@@ -26,8 +27,9 @@ export async function getResetImpact(): Promise<ResetImpact> {
       db.tasks.count(),
       db.keyEvents.count(),
       db.poojaAssignments.count(),
+      db.inventoryItems.count(),
     ])
-  return { years, donations, expectedDonations, expenses, expectedExpenses, auctions, tasks, keyEvents, poojaAssignments }
+  return { years, donations, expectedDonations, expenses, expectedExpenses, auctions, tasks, keyEvents, poojaAssignments, inventoryItems }
 }
 
 /** Wipes every table and reseeds default categories/units/settings and a fresh current-year profile. */
@@ -47,6 +49,7 @@ export async function resetApplication(): Promise<YearProfile[]> {
       db.tasks,
       db.keyEvents,
       db.poojaAssignments,
+      db.inventoryItems,
       db.appSettings,
     ],
     async () => {
@@ -63,6 +66,7 @@ export async function resetApplication(): Promise<YearProfile[]> {
         db.tasks.clear(),
         db.keyEvents.clear(),
         db.poojaAssignments.clear(),
+        db.inventoryItems.clear(),
         db.appSettings.clear(),
       ])
     },

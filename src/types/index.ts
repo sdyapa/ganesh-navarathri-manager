@@ -198,6 +198,36 @@ export interface PoojaAssignment {
   updatedAt: IsoTimestamp
 }
 
+export type InventoryItemStatus = 'stored' | 'returned'
+
+/** Equipment/property (speaker, amplifier, carpets, lights, etc.) kept at a committee member's
+ *  home between festivals — year-scoped like Tasks, since "who's holding what" is tracked fresh
+ *  each season even if the same physical item recurs. `keptWith` reuses the Profile registry
+ *  (kind 'person') for autocomplete, the same way Donor/Auction-participant names do, rather
+ *  than a fresh free-text field with no suggestion list. */
+export interface InventoryItem {
+  id: string
+  yearProfileId: string
+  itemName: string
+  quantity?: number
+  keptWith: string
+  notes?: string
+  status: InventoryItemStatus
+  storedDate: DateOnly
+  returnedDate?: DateOnly | null
+  /** Set when this item was carried forward from a prior year's still-'stored' item via
+   *  Copy to Next Year (see copyForwardService.ts's copyInventoryItemsToYear) — this is a
+   *  reconciliation checklist, not a blind duplicate: only still-outstanding items are ever
+   *  eligible to copy, so the new year's card can show "Carried from {source year}" and get
+   *  explicitly checked off ('Mark Returned') once the physical item actually comes back,
+   *  making anything left unchecked by season's end a visible "not yet returned" list. The
+   *  source item in the prior year is left untouched by copying — only a separate "Mark
+   *  Returned" action changes it. */
+  sourceInventoryItemId?: string | null
+  createdAt: IsoTimestamp
+  updatedAt: IsoTimestamp
+}
+
 export interface WhatsAppTemplates {
   monetary: string
   commodity: string
@@ -321,6 +351,7 @@ export interface YearProfileBundle {
   tasks: Task[]
   keyEvents: KeyEvent[]
   poojaAssignments: PoojaAssignment[]
+  inventoryItems: InventoryItem[]
 }
 
 export interface BackupFile {
