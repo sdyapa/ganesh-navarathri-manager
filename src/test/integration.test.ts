@@ -54,6 +54,7 @@ import {
   getLocalBackupDirectoryHandle,
   clearLocalBackupDirectoryHandle,
 } from '@/db/repositories/localBackupHandle'
+import { matchesSearch } from '@/lib/tableUtils'
 import { DEFAULT_DISPLAY_NAME } from '@/db/defaults'
 import { seedSampleData, YearHasRealDataError } from '@/services/sampleDataService'
 import { ensureAppInitialized } from '@/db/init'
@@ -745,6 +746,28 @@ describe('copy Actual records forward to Expected (recurring items)', () => {
 })
 
 describe('Tasks and checklists', () => {
+  it('search matches a task by title, notes, or a checklist item label', async () => {
+    const year = await createYearProfile({ year: 3130, name: 'GN 3130', carryForward: false })
+    const task = await insertTask(year.id, {
+      title: 'Buy pooja items',
+      dueDate: '3130-08-10',
+      notes: 'Ask Sharma Ji for a discount',
+      checklistItems: ['Flowers', 'Coconuts', 'Camphor'],
+    })
+    const other = await insertTask(year.id, { title: 'Book priest', dueDate: '3130-08-05', notes: undefined, checklistItems: [] })
+
+    // Simulates TasksPage's filtered useMemo: matchesSearch([t.title, t.notes, ...checklist labels], query)
+    function matchesTaskSearch(t: typeof task, query: string) {
+      return matchesSearch([t.title, t.notes, ...t.checklist.map((c) => c.label)], query)
+    }
+
+    expect(matchesTaskSearch(task, 'pooja')).toBe(true) // title match
+    expect(matchesTaskSearch(task, 'sharma')).toBe(true) // notes match
+    expect(matchesTaskSearch(task, 'flowers')).toBe(true) // checklist item label match — the whole point of this feature
+    expect(matchesTaskSearch(task, 'coconuts')).toBe(true)
+    expect(matchesTaskSearch(other, 'flowers')).toBe(false) // a task with no matching checklist item is excluded
+  })
+
   it('creates a task with checklist items parsed at creation, then supports toggling and removing items independently', async () => {
     const year = await createYearProfile({ year: 3110, name: 'GN 3110', carryForward: false })
 
@@ -821,6 +844,34 @@ describe('festival calendar (Key Events + Pooja Roster)', () => {
     }
     const inspection = await inspectBackupFile(stripped)
     expect(inspection.valid).toBe(true)
+  })
+
+  it('search matches Key Events by name or notes (simulating KeyEventsSection filter)', async () => {
+    const year = await createYearProfile({ year: 3121, name: 'GN 3121', carryForward: false })
+    const nimajjanam = await insertKeyEvent(year.id, { name: 'Nimajjanam', date: '3121-09-06', notes: 'Immersion at the lake' })
+    await insertKeyEvent(year.id, { name: 'Annadanam', date: '3121-08-30', notes: undefined })
+
+    function matches(e: typeof nimajjanam, query: string) {
+      return matchesSearch([e.name, e.notes], query)
+    }
+
+    expect(matches(nimajjanam, 'nimajjanam')).toBe(true)
+    expect(matches(nimajjanam, 'lake')).toBe(true) // notes match
+    expect(matches(nimajjanam, 'annadanam')).toBe(false)
+  })
+
+  it('search matches Pooja Roster entries by family names or notes (simulating PoojaRosterSection filter)', async () => {
+    const year = await createYearProfile({ year: 3122, name: 'GN 3122', carryForward: false })
+    const entry = await insertPoojaAssignment(year.id, { date: '3122-08-29', familyNames: 'Sharma family, Reddy family', notes: 'Morning slot' })
+
+    function matches(a: typeof entry, query: string) {
+      return matchesSearch([a.familyNames, a.notes], query)
+    }
+
+    expect(matches(entry, 'sharma')).toBe(true)
+    expect(matches(entry, 'reddy')).toBe(true)
+    expect(matches(entry, 'morning')).toBe(true) // notes match
+    expect(matches(entry, 'gupta')).toBe(false)
   })
 })
 

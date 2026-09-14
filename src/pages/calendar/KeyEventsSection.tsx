@@ -7,6 +7,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { insertKeyEvent, updateKeyEvent, deleteKeyEvent } from '@/db/repositories/keyEvents'
 import { keyEventInputSchema } from '@/lib/validation'
 import { compareDateOnly, formatDisplayDate, todayDateOnly } from '@/lib/date'
+import { matchesSearch } from '@/lib/tableUtils'
 import { ActionButton } from '@/components/common/ActionButton'
 import { EDIT_ICON, DELETE_ICON } from '@/lib/actionIcons'
 import type { KeyEvent } from '@/types'
@@ -29,8 +30,15 @@ export function KeyEventsSection() {
   const [editing, setEditing] = useState<{ id: string; fields: DraftFields } | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<KeyEvent | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
 
-  const sorted = useMemo(() => [...(events ?? [])].sort((a, b) => compareDateOnly(a.date, b.date)), [events])
+  const sorted = useMemo(
+    () =>
+      [...(events ?? [])]
+        .filter((e) => matchesSearch([e.name, e.notes], search))
+        .sort((a, b) => compareDateOnly(a.date, b.date)),
+    [events, search],
+  )
 
   if (!currentYearId || events === undefined) {
     return <p className="page-loading">Loading key events…</p>
@@ -79,8 +87,21 @@ export function KeyEventsSection() {
         this year. Add only what applies; nothing is required.
       </p>
 
+      {(events?.length ?? 0) > 0 && (
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search event name, notes…"
+          aria-label="Search key events"
+        />
+      )}
+
       {sorted.length === 0 ? (
-        <EmptyState title="No key events added yet" description="Add dates like Annadanam, Nimajjanam, or Kumkumarchana." />
+        <EmptyState
+          title={search ? 'No matching key events' : 'No key events added yet'}
+          description={search ? 'Try a different search.' : 'Add dates like Annadanam, Nimajjanam, or Kumkumarchana.'}
+        />
       ) : (
         <ul className="manage-list">
           {sorted.map((ev) =>

@@ -4,7 +4,7 @@ import { useYearContext } from '@/context/YearContext'
 import { useTasks } from '@/hooks/useYearData'
 import { useToast } from '@/context/ToastContext'
 import { EmptyState } from '@/components/common/EmptyState'
-import { FilterBar, SelectFilter, SortControl } from '@/components/common/Filters'
+import { FilterBar, SearchInput, SelectFilter, SortControl } from '@/components/common/Filters'
 import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { SummaryList } from '@/components/common/SummaryList'
 import { ActionButton } from '@/components/common/ActionButton'
@@ -22,7 +22,7 @@ import {
 import { copyTasksToYear } from '@/services/copyForwardService'
 import { getOrCreateNextYearProfile } from '@/services/yearService'
 import { formatDisplayDate } from '@/lib/date'
-import { sortByKey, type SortDirection } from '@/lib/tableUtils'
+import { matchesSearch, sortByKey, type SortDirection } from '@/lib/tableUtils'
 import { pluralize } from '@/lib/pluralize'
 import { EDIT_ICON, DELETE_ICON, DONE_ICON, UNDO_DONE_ICON } from '@/lib/actionIcons'
 import type { TaskInput } from '@/lib/validation'
@@ -45,6 +45,7 @@ export function TasksPage() {
   const [modal, setModal] = useState<ModalState>(searchParams.get('add') ? { mode: 'add' } : { mode: 'closed' })
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null)
   const [busy, setBusy] = useState(false)
+  const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('pending')
   const [sortOption, setSortOption] = useState('dueDate-asc')
   const [checklistDrafts, setChecklistDrafts] = useState<Record<string, string>>({})
@@ -53,13 +54,15 @@ export function TasksPage() {
   const filtered = useMemo(() => {
     if (!tasks) return []
     const [sortField, sortDirection] = sortOption.split('-') as [keyof Task, SortDirection]
-    const base = tasks.filter((t) => {
-      if (statusFilter === 'pending') return !t.done
-      if (statusFilter === 'done') return t.done
-      return true
-    })
+    const base = tasks
+      .filter((t) => {
+        if (statusFilter === 'pending') return !t.done
+        if (statusFilter === 'done') return t.done
+        return true
+      })
+      .filter((t) => matchesSearch([t.title, t.notes, ...t.checklist.map((c) => c.label)], search))
     return sortByKey(base, sortField, sortDirection)
-  }, [tasks, statusFilter, sortOption])
+  }, [tasks, statusFilter, search, sortOption])
 
   if (!currentYearId || tasks === undefined) {
     return <p className="page-loading">Loading tasks…</p>
@@ -157,6 +160,7 @@ export function TasksPage() {
       ) : (
         <>
           <FilterBar>
+            <SearchInput value={search} onChange={setSearch} placeholder="Search title, notes, checklist…" />
             <SelectFilter
               label="Status"
               value={statusFilter}

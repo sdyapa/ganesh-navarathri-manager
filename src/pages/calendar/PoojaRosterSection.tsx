@@ -7,6 +7,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog'
 import { insertPoojaAssignment, updatePoojaAssignment, deletePoojaAssignment } from '@/db/repositories/poojaAssignments'
 import { poojaAssignmentInputSchema } from '@/lib/validation'
 import { compareDateOnly, formatDisplayDate, todayDateOnly } from '@/lib/date'
+import { matchesSearch } from '@/lib/tableUtils'
 import { ActionButton } from '@/components/common/ActionButton'
 import { EDIT_ICON, DELETE_ICON } from '@/lib/actionIcons'
 import type { PoojaAssignment } from '@/types'
@@ -29,8 +30,15 @@ export function PoojaRosterSection() {
   const [editing, setEditing] = useState<{ id: string; fields: DraftFields } | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<PoojaAssignment | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
 
-  const sorted = useMemo(() => [...(assignments ?? [])].sort((a, b) => compareDateOnly(a.date, b.date)), [assignments])
+  const sorted = useMemo(
+    () =>
+      [...(assignments ?? [])]
+        .filter((a) => matchesSearch([a.familyNames, a.notes], search))
+        .sort((a, b) => compareDateOnly(a.date, b.date)),
+    [assignments, search],
+  )
 
   if (!currentYearId || assignments === undefined) {
     return <p className="page-loading">Loading pooja roster…</p>
@@ -83,8 +91,21 @@ export function PoojaRosterSection() {
         family names as needed, comma-separated.
       </p>
 
+      {(assignments?.length ?? 0) > 0 && (
+        <input
+          type="search"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search family name, notes…"
+          aria-label="Search pooja roster"
+        />
+      )}
+
       {sorted.length === 0 ? (
-        <EmptyState title="No pooja roster entries yet" description="Track which family performed pooja each day." />
+        <EmptyState
+          title={search ? 'No matching pooja roster entries' : 'No pooja roster entries yet'}
+          description={search ? 'Try a different search.' : 'Track which family performed pooja each day.'}
+        />
       ) : (
         <ul className="manage-list">
           {sorted.map((a) =>
