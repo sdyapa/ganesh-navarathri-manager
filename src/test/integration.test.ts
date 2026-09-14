@@ -16,9 +16,10 @@ import {
   convertAuctionToExpectedDonation,
   revertDonationToExpected,
   revertExpenseToExpected,
+  recordPartialPayment,
 } from '@/services/conversionService'
 import { insertDonation, listDonationsForYear, getDonation } from '@/db/repositories/donations'
-import { insertExpectedDonation, listExpectedDonationsForYear } from '@/db/repositories/expectedDonations'
+import { insertExpectedDonation, listExpectedDonationsForYear, getExpectedDonation } from '@/db/repositories/expectedDonations'
 import { insertAuction, getAuction } from '@/db/repositories/auctions'
 import { insertExpense, getExpense } from '@/db/repositories/expenses'
 import { insertExpectedExpense, listExpectedExpensesForYear } from '@/db/repositories/expectedExpenses'
@@ -175,6 +176,119 @@ describe('expected -> actual conversion', () => {
     const [updatedExpected] = await listExpectedExpensesForYear(year.id)
     expect(updatedExpected.status).toBe('converted')
     expect(await getYearClosingBalance(year.id)).toBe(-6000)
+  })
+})
+
+describe('part payments (installments) for donation/auction pledges', () => {
+  it('records two partial payments against a pledge: first leaves it partially-paid, second (reaching the full amount) converts it', async () => {
+    const chanda = await categoryId('donation', 'Chanda')
+    const year = await createYearProfile({ year: 3060, name: 'GN 3060', carryForward: false })
+
+    const pledge = await insertExpectedDonation(year.id, {
+      donorName: 'Ramesh',
+      type: 'monetary',
+      amount: 20000,
+      date: '3060-08-20',
+      categoryId: chanda,
+    })
+
+    const first = await recordPartialPayment(pledge.id, year.id, {
+      donorName: 'Ramesh',
+      type: 'monetary',
+      amount: 5000,
+      date: '3060-08-25',
+      categoryId: chanda,
+    })
+    expect(first.sourceExpectedDonationId).toBe(pledge.id)
+
+    let updated = await getExpectedDonation(pledge.id)
+    expect(updated?.status).toBe('partially-paid')
+    expect(updated?.installmentDonationIds).toEqual([first.id])
+    expect(updated?.convertedDonationId).toBeNull()
+    expect(await getYearClosingBalance(year.id)).toBe(5000) // each installment hits the actual balance immediately
+
+    const second = await recordPartialPayment(pledge.id, year.id, {
+      donorName: 'Ramesh',
+      type: 'monetary',
+      amount: 15000,
+      date: '3060-09-01',
+      categoryId: chanda,
+    })
+
+    updated = await getExpectedDonation(pledge.id)
+    expect(updated?.status).toBe('converted') // 5000 + 15000 = 20000, the full pledge
+    expect(updated?.installmentDonationIds).toEqual([first.id, second.id])
+    expect(updated?.convertedDonationId).toBe(second.id)
+    expect(await getYearClosingBalance(year.id)).toBe(20000)
+  })
+
+  it('a pledge fully paid in one shot via the existing convertExpectedDonationToDonation still behaves exactly as before (regression check)', async () => {
+    const chanda = await categoryId('donation', 'Chanda')
+    const year = await createYearProfile({ year: 3061, name: 'GN 3061', carryForward: false })
+
+    const pledge = await insertExpectedDonation(year.id, { donorName: 'Suresh', type: 'monetary', amount: 8000, date: '3061-08-20', categoryId: chanda })
+    const donation = await convertExpectedDonationToDonation(pledge.id, year.id, {
+      donorName: 'Suresh',
+      type: 'monetary',
+      amount: 8000,
+      date: '3061-08-21',
+      categoryId: chanda,
+    })
+
+    const updated = await getExpectedDonation(pledge.id)
+    expect(updated?.status).toBe('converted')
+    expect(updated?.convertedDonationId).toBe(donation.id)
+    expect(updated?.installmentDonationIds ?? []).toEqual([]) // untouched by the one-shot path
+  })
+
+  it('reverting one installment of a still-partial pledge drops it back to partially-paid (not pending) when another installment remains', async () => {
+    const chanda = await categoryId('donation', 'Chanda')
+    const year = await createYearProfile({ year: 3062, name: 'GN 3062', carryForward: false })
+
+    const pledge = await insertExpectedDonation(year.id, { donorName: 'Ramesh', type: 'monetary', amount: 20000, date: '3062-08-20', categoryId: chanda })
+    const first = await recordPartialPayment(pledge.id, year.id, { donorName: 'Ramesh', type: 'monetary', amount: 5000, date: '3062-08-25', categoryId: chanda })
+    const second = await recordPartialPayment(pledge.id, year.id, { donorName: 'Ramesh', type: 'monetary', amount: 6000, date: '3062-09-01', categoryId: chanda })
+
+    let updated = await getExpectedDonation(pledge.id)
+    expect(updated?.status).toBe('partially-paid') // 5000 + 6000 = 11000, still short of the 20000 pledge
+
+    await revertDonationToExpected(second)
+
+    expect(await getDonation(second.id)).toBeUndefined()
+    updated = await getExpectedDonation(pledge.id)
+    expect(updated?.status).toBe('partially-paid') // first installment still stands
+    expect(updated?.installmentDonationIds).toEqual([first.id])
+    expect(await getYearClosingBalance(year.id)).toBe(5000)
+
+    await revertDonationToExpected(first)
+
+    expect(await getDonation(first.id)).toBeUndefined()
+    updated = await getExpectedDonation(pledge.id)
+    expect(updated?.status).toBe('pending') // no installments left at all
+    expect(updated?.installmentDonationIds ?? []).toEqual([])
+    expect(await getYearClosingBalance(year.id)).toBe(0)
+  })
+
+  it('an auction pledge (sourceAuctionId set) supports partial payments identically to a direct donor pledge', async () => {
+    const chanda = await categoryId('donation', 'Chanda')
+    const sourceYear = await createYearProfile({ year: 3063, name: 'GN 3063', carryForward: false })
+    const auction = await insertAuction(sourceYear.id, { item: 'Pedda Laddu', person: 'Ganesh', amount: 12000, date: '3063-09-05' })
+
+    const { profile: targetYear } = await getOrCreateNextYearProfile(sourceYear.id)
+    const pledge = await convertAuctionToExpectedDonation(auction.id, targetYear.id, {
+      donorName: 'Ganesh',
+      type: 'monetary',
+      amount: 12000,
+      date: '3064-08-20',
+      categoryId: chanda,
+    })
+    expect(pledge.sourceAuctionId).toBe(auction.id)
+
+    await recordPartialPayment(pledge.id, targetYear.id, { donorName: 'Ganesh', type: 'monetary', amount: 4000, date: '3064-08-25', categoryId: chanda })
+
+    const updated = await getExpectedDonation(pledge.id)
+    expect(updated?.status).toBe('partially-paid')
+    expect(updated?.sourceAuctionId).toBe(auction.id) // untouched by the partial payment
   })
 })
 

@@ -36,6 +36,25 @@ export interface SummaryInput {
 const sum = (values: Array<number | undefined>): number =>
   values.reduce((acc: number, v) => acc + (Number.isFinite(v) ? (v as number) : 0), 0)
 
+/** How much of a monetary pledge is still outstanding — its full amount minus whatever's
+ *  already been collected via installmentDonationIds (see ExpectedDonation's doc comment). A
+ *  plain 'pending' pledge with no installments yet is fully outstanding (its whole amount);
+ *  this only differs from `pledge.amount` once at least one partial payment has been recorded.
+ *  `donations` must be the same year's Donation list the pledge's installments were inserted
+ *  into (always true for computeFinancialSummary's per-year call). Never negative — an
+ *  over-collected pledge (shouldn't normally happen since recordPartialPayment marks it
+ *  'converted' once the total reaches the full amount) still reports 0 outstanding rather than
+ *  a confusing negative "expected" figure. */
+export function computeOutstandingPledgeAmount(pledge: ExpectedDonation, donations: Donation[]): number {
+  if (!pledge.installmentDonationIds || pledge.installmentDonationIds.length === 0) {
+    return pledge.amount ?? 0
+  }
+  const collected = sum(
+    pledge.installmentDonationIds.map((id) => donations.find((d) => d.id === id)?.amount),
+  )
+  return Math.max(0, (pledge.amount ?? 0) - collected)
+}
+
 export function computeFinancialSummary(input: SummaryInput): FinancialSummary {
   const { yearProfileId, openingBalance, donations, expectedDonations, expenses, expectedExpenses, auctions } = input
 
@@ -48,11 +67,16 @@ export function computeFinancialSummary(input: SummaryInput): FinancialSummary {
   // Auction proceeds are deliberately excluded — see the "Hard rules" comment above.
   const closingBalance = openingBalance + totalMonetaryDonations - totalExpenses
 
-  const pendingExpectedDonations = expectedDonations.filter((d) => d.status === 'pending')
+  // 'partially-paid' pledges are still outstanding (only 'converted' means fully collected), so
+  // they count as "expected" alongside plain 'pending' ones — see computeOutstandingPledgeAmount
+  // below for why the *amount* counted is the remaining balance, not the full pledge.
+  const pendingExpectedDonations = expectedDonations.filter((d) => d.status !== 'converted')
   const pendingExpectedExpenses = expectedExpenses.filter((e) => e.status === 'pending')
 
   const expectedMonetaryDonations = sum(
-    pendingExpectedDonations.filter((d) => d.type === 'monetary').map((d) => d.amount),
+    pendingExpectedDonations
+      .filter((d) => d.type === 'monetary')
+      .map((d) => computeOutstandingPledgeAmount(d, donations)),
   )
   const expectedCommodityDonationCount = pendingExpectedDonations.filter((d) => d.type === 'commodity').length
   const expectedExpensesTotal = sum(pendingExpectedExpenses.map((e) => e.amount))

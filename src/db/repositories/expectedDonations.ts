@@ -69,3 +69,14 @@ export async function markExpectedDonationConverted(id: string, donationId: stri
     updatedAt: nowIso(),
   })
 }
+
+/** Updates the fields recordPartialPayment (conversionService.ts) needs to touch after each
+ *  installment — kept as its own narrow function (rather than reusing updateExpectedDonation,
+ *  which takes a full form-shaped ExpectedDonationInput) since this only ever changes
+ *  payment-tracking fields, never the donor/amount/category fields a form edit would. */
+export async function updateExpectedDonationPaymentState(
+  id: string,
+  patch: { status: ExpectedDonation['status']; installmentDonationIds: string[]; convertedDonationId: string | null },
+): Promise<void> {
+  await db.expectedDonations.update(id, { ...patch, updatedAt: nowIso() })
+}

@@ -59,3 +59,13 @@ export async function updateDonation(id: string, input: DonationInput): Promise<
 export async function deleteDonation(id: string): Promise<void> {
   await db.donations.delete(id)
 }
+
+/** Sums the monetary amount of a specific set of Donations by id — used to compute how much of
+ *  a pledge has been collected so far from its installmentDonationIds (see ExpectedDonation's
+ *  doc comment and conversionService.ts's recordPartialPayment). Missing ids (shouldn't happen,
+ *  but a deleted Donation would otherwise silently corrupt the running total) are skipped. */
+export async function sumDonationAmounts(ids: string[]): Promise<number> {
+  if (ids.length === 0) return 0
+  const records = await db.donations.bulkGet(ids)
+  return records.reduce((sum, d) => sum + (d?.amount ?? 0), 0)
+}

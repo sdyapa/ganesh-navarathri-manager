@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useYearContext } from '@/context/YearContext'
-import { useCategories, useExpectedDonations, useUnits } from '@/hooks/useYearData'
+import { useCategories, useDonations, useExpectedDonations, useUnits } from '@/hooks/useYearData'
 import { usePagination } from '@/hooks/usePagination'
 import { useToast } from '@/context/ToastContext'
 import { useWhatsAppShare } from '@/hooks/useWhatsAppShare'
@@ -20,12 +20,13 @@ import {
   updateExpectedDonation,
   deleteExpectedDonation,
 } from '@/db/repositories/expectedDonations'
-import { convertExpectedDonationToDonation } from '@/services/conversionService'
+import { convertExpectedDonationToDonation, recordPartialPayment } from '@/services/conversionService'
 import { formatCurrency, formatNumber } from '@/lib/currency'
 import { formatDisplayDate, todayDateOnly } from '@/lib/date'
 import { matchesSearch, sortByKey, type SortDirection } from '@/lib/tableUtils'
+import { computeOutstandingPledgeAmount } from '@/lib/calculations'
 import { diffFields } from '@/lib/diff'
-import { EDIT_ICON, DELETE_ICON, DUPLICATE_ICON, MOVE_ICON } from '@/lib/actionIcons'
+import { EDIT_ICON, DELETE_ICON, DUPLICATE_ICON, MOVE_ICON, PARTIAL_PAYMENT_ICON } from '@/lib/actionIcons'
 import type { DonationInput } from '@/lib/validation'
 import type { ExpectedDonation } from '@/types'
 
@@ -35,6 +36,13 @@ type ModalState =
   | { mode: 'edit'; record: ExpectedDonation }
   | { mode: 'duplicate'; record: ExpectedDonation }
   | { mode: 'convert'; record: ExpectedDonation }
+  | { mode: 'partial-payment'; record: ExpectedDonation }
+
+function statusBadge(status: ExpectedDonation['status']) {
+  if (status === 'converted') return <span className="badge badge--success">Converted</span>
+  if (status === 'partially-paid') return <span className="badge badge--warning">Partially Paid</span>
+  return <span className="badge">Pending</span>
+}
 
 const SORT_OPTIONS = [
   { value: 'date-desc', label: 'Expected Date (Newest first)' },
@@ -46,6 +54,7 @@ const SORT_OPTIONS = [
 export function ExpectedDonationsPage() {
   const { currentYearId } = useYearContext()
   const records = useExpectedDonations(currentYearId)
+  const donations = useDonations(currentYearId)
   const categories = useCategories('donation')
   const units = useUnits()
   const { showToast } = useToast()
@@ -57,7 +66,10 @@ export function ExpectedDonationsPage() {
   const [deleteTarget, setDeleteTarget] = useState<ExpectedDonation | null>(null)
   const [busy, setBusy] = useState(false)
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('pending')
+  // 'outstanding' (the default) covers both 'pending' and 'partially-paid' — a partially-paid
+  // pledge still has money outstanding, so it shouldn't disappear from the default view the way
+  // a stricter status === 'pending' filter would leave it hidden.
+  const [statusFilter, setStatusFilter] = useState('outstanding')
   const [sortOption, setSortOption] = useState('date-desc')
 
   const categoryName = (id: string) => categories?.find((c) => c.id === id)?.name ?? 'Uncategorized'
@@ -67,15 +79,22 @@ export function ExpectedDonationsPage() {
     if (!records) return []
     const [sortField, sortDirection] = sortOption.split('-') as [keyof ExpectedDonation, SortDirection]
     const base = records
-      .filter((d) => (statusFilter ? d.status === statusFilter : true))
+      .filter((d) => {
+        if (statusFilter === 'outstanding') return d.status !== 'converted'
+        return statusFilter ? d.status === statusFilter : true
+      })
       .filter((d) => matchesSearch([d.donorName, d.commodityName, d.notes], search))
     return sortByKey(base, sortField, sortDirection)
   }, [records, statusFilter, search, sortOption])
 
   const { pageItems, page, totalPages, hasNext, hasPrev, next, prev } = usePagination(filtered, 25)
 
-  if (!currentYearId || records === undefined || categories === undefined || units === undefined) {
+  if (!currentYearId || records === undefined || donations === undefined || categories === undefined || units === undefined) {
     return <p className="page-loading">Loading expected donations…</p>
+  }
+
+  function outstandingAmount(record: ExpectedDonation): number {
+    return computeOutstandingPledgeAmount(record, donations!)
   }
 
   async function handleAdd(input: DonationInput) {
@@ -134,6 +153,20 @@ export function ExpectedDonationsPage() {
     }
   }
 
+  async function handleRecordPartialPayment(record: ExpectedDonation, input: DonationInput) {
+    setBusy(true)
+    try {
+      await recordPartialPayment(record.id, currentYearId!, input)
+      setModal({ mode: 'closed' })
+      showToast('Payment recorded successfully', 'success', {
+        label: 'Copy WhatsApp message',
+        onClick: () => shareDonation(input),
+      })
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function handleDuplicate(input: DonationInput) {
     await insertExpectedDonation(currentYearId!, input)
     setModal({ mode: 'closed' })
@@ -160,16 +193,30 @@ export function ExpectedDonationsPage() {
       key: 'amount',
       header: 'Amount / Commodity',
       align: 'right',
-      render: (d) => (d.type === 'monetary' ? formatCurrency(d.amount) : `${d.commodityName} (${formatNumber(d.quantity)} ${unitName(d.unitId)})`),
+      render: (d) =>
+        d.type === 'monetary' ? (
+          d.status === 'partially-paid' ? (
+            <span>
+              {formatCurrency(outstandingAmount(d))} of {formatCurrency(d.amount)} outstanding
+            </span>
+          ) : (
+            formatCurrency(d.amount)
+          )
+        ) : (
+          `${d.commodityName} (${formatNumber(d.quantity)} ${unitName(d.unitId)})`
+        ),
     },
     { key: 'category', header: 'Category', render: (d) => categoryName(d.categoryId) },
-    { key: 'status', header: 'Status', render: (d) => (d.status === 'converted' ? <span className="badge badge--success">Converted</span> : <span className="badge">Pending</span>) },
+    { key: 'status', header: 'Status', render: (d) => statusBadge(d.status) },
     {
       key: 'actions',
       header: 'Actions',
       render: (d) =>
-        d.status === 'pending' ? (
+        d.status !== 'converted' ? (
           <div className="row-actions">
+            {d.type === 'monetary' && (
+              <ActionButton icon={PARTIAL_PAYMENT_ICON} label="Record Partial Payment" onClick={() => setModal({ mode: 'partial-payment', record: d })} />
+            )}
             <ActionButton icon={MOVE_ICON} label="Convert to Donation" onClick={() => setModal({ mode: 'convert', record: d })} />
             <ActionButton icon={EDIT_ICON} label="Edit" onClick={() => setModal({ mode: 'edit', record: d })} />
             <ActionButton icon={DUPLICATE_ICON} label="Duplicate" onClick={() => setModal({ mode: 'duplicate', record: d })} />
@@ -216,7 +263,9 @@ export function ExpectedDonationsPage() {
               value={statusFilter}
               onChange={setStatusFilter}
               options={[
+                { value: 'outstanding', label: 'Outstanding (Pending + Partially Paid)' },
                 { value: 'pending', label: 'Pending' },
+                { value: 'partially-paid', label: 'Partially Paid' },
                 { value: 'converted', label: 'Converted' },
               ]}
             />
@@ -235,16 +284,23 @@ export function ExpectedDonationsPage() {
                   <>
                     <div className="record-card__top">
                       <strong>{d.donorName}</strong>
-                      {d.status === 'converted' ? <span className="badge badge--success">Converted</span> : <span className="badge">Pending</span>}
+                      {statusBadge(d.status)}
                     </div>
                     <div className="record-card__amount">
-                      {d.type === 'monetary' ? formatCurrency(d.amount) : `${d.commodityName} — ${formatNumber(d.quantity)} ${unitName(d.unitId)}`}
+                      {d.type === 'monetary'
+                        ? d.status === 'partially-paid'
+                          ? `${formatCurrency(outstandingAmount(d))} of ${formatCurrency(d.amount)} outstanding`
+                          : formatCurrency(d.amount)
+                        : `${d.commodityName} — ${formatNumber(d.quantity)} ${unitName(d.unitId)}`}
                     </div>
                     <div className="record-card__meta">
                       Expected {formatDisplayDate(d.date)} · {categoryName(d.categoryId)}
                     </div>
-                    {d.status === 'pending' && (
+                    {d.status !== 'converted' && (
                       <div className="row-actions">
+                        {d.type === 'monetary' && (
+                          <ActionButton icon={PARTIAL_PAYMENT_ICON} label="Record Partial Payment" onClick={() => setModal({ mode: 'partial-payment', record: d })} />
+                        )}
                         <ActionButton icon={MOVE_ICON} label="Convert to Donation" onClick={() => setModal({ mode: 'convert', record: d })} />
                         <ActionButton icon={EDIT_ICON} label="Edit" onClick={() => setModal({ mode: 'edit', record: d })} />
                         <ActionButton icon={DUPLICATE_ICON} label="Duplicate" onClick={() => setModal({ mode: 'duplicate', record: d })} />
@@ -308,6 +364,19 @@ export function ExpectedDonationsPage() {
           categories={categories}
           units={units}
           onSubmit={(input) => handleConvert(modal.record, input)}
+          onClose={() => setModal({ mode: 'closed' })}
+        />
+      )}
+
+      {modal.mode === 'partial-payment' && (
+        <DonationForm
+          title="Record Partial Payment"
+          description={`Outstanding balance: ${formatCurrency(outstandingAmount(modal.record))} of ${formatCurrency(modal.record.amount)}. Enter how much was actually received this time — the pledge stays "Partially Paid" until the full amount is collected.`}
+          submitLabel={busy ? 'Recording…' : 'Record Payment'}
+          initialValues={{ ...donationToFormValues(modal.record, todayDateOnly()), amount: '' }}
+          categories={categories}
+          units={units}
+          onSubmit={(input) => handleRecordPartialPayment(modal.record, input)}
           onClose={() => setModal({ mode: 'closed' })}
         />
       )}

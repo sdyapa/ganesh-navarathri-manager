@@ -5,6 +5,7 @@ import {
   computeCommodityTotals,
   computeDailyTrend,
   computeFinancialSummary,
+  computeOutstandingPledgeAmount,
   computeSpentFraction,
 } from '@/lib/calculations'
 import type { Auction, Donation, ExpectedDonation, ExpectedExpense, Expense } from '@/types'
@@ -131,6 +132,30 @@ describe('computeFinancialSummary', () => {
     expect(summary.counts.expectedDonations).toBe(1)
   })
 
+  it('counts only the outstanding (uncollected) balance of a partially-paid pledge as "expected", not its full original amount', () => {
+    const installment = donation({ id: 'installment-1', amount: 8000 })
+    const pledge: ExpectedDonation = {
+      ...donation({ id: 'pledge-1', amount: 20000 }),
+      status: 'partially-paid',
+      convertedDonationId: null,
+      installmentDonationIds: ['installment-1'],
+    } as ExpectedDonation
+
+    const summary = computeFinancialSummary({
+      yearProfileId: 'y1',
+      openingBalance: 0,
+      donations: [installment], // the installment is itself a real Donation, already collected
+      expectedDonations: [pledge],
+      expenses: [],
+      expectedExpenses: [],
+      auctions: [],
+    })
+
+    expect(summary.expectedMonetaryDonations).toBe(12000) // 20000 pledge - 8000 already collected
+    expect(summary.counts.expectedDonations).toBe(1) // still counted as one outstanding pledge
+    expect(summary.totalMonetaryDonations).toBe(8000) // the installment itself is real, actual money
+  })
+
   it('never lets a ₹0 or negative record silently distort the balance beyond what was entered', () => {
     const summary = computeFinancialSummary({
       yearProfileId: 'y1',
@@ -142,6 +167,25 @@ describe('computeFinancialSummary', () => {
       auctions: [],
     })
     expect(summary.closingBalance).toBe(100)
+  })
+})
+
+describe('computeOutstandingPledgeAmount', () => {
+  it('returns the full pledge amount for a plain pending pledge with no installments yet', () => {
+    const pledge = { ...donation({ amount: 20000 }), status: 'pending', installmentDonationIds: [] } as unknown as ExpectedDonation
+    expect(computeOutstandingPledgeAmount(pledge, [])).toBe(20000)
+  })
+
+  it('subtracts installments already collected from the full pledge amount', () => {
+    const installment = donation({ id: 'i1', amount: 5000 })
+    const pledge = { ...donation({ amount: 20000 }), status: 'partially-paid', installmentDonationIds: ['i1'] } as unknown as ExpectedDonation
+    expect(computeOutstandingPledgeAmount(pledge, [installment])).toBe(15000)
+  })
+
+  it('never goes negative even if installments somehow exceed the pledge amount', () => {
+    const installment = donation({ id: 'i1', amount: 25000 })
+    const pledge = { ...donation({ amount: 20000 }), status: 'partially-paid', installmentDonationIds: ['i1'] } as unknown as ExpectedDonation
+    expect(computeOutstandingPledgeAmount(pledge, [installment])).toBe(0)
   })
 })
 

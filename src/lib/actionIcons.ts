@@ -14,3 +14,5 @@ export const MOVE_ICON = '➡️'
 export const REVERT_ICON = '↩️'
 export const DONE_ICON = '✅'
 export const UNDO_DONE_ICON = '↩️'
+/** Recording one installment of a pledge paid in parts (Record Partial Payment). */
+export const PARTIAL_PAYMENT_ICON = '💵'

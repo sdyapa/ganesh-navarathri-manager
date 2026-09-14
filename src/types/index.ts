@@ -7,7 +7,10 @@ export type DateOnly = string // "YYYY-MM-DD"
 export type IsoTimestamp = string // new Date().toISOString()
 
 export type DonationType = 'monetary' | 'commodity'
-export type ExpectedStatus = 'pending' | 'converted'
+/** 'partially-paid' only ever applies to ExpectedDonation (see its installmentDonationIds doc
+ *  comment) — ExpectedExpense shares this type but never sets that value, since expenses aren't
+ *  paid in tracked installments the way donation pledges can be. */
+export type ExpectedStatus = 'pending' | 'partially-paid' | 'converted'
 export type CategoryKind = 'donation' | 'expense'
 export type YearProfileStatus = 'active' | 'archived'
 
@@ -55,12 +58,26 @@ export interface ExpectedDonation extends BaseRecord {
   quantity?: number
   unitId?: string
   status: ExpectedStatus
-  /** Set once converted, pointing at the resulting Donation. */
+  /** Set once converted, pointing at the resulting Donation. For a pledge paid in installments
+   *  (see installmentDonationIds below), this is only set once the LAST installment brings the
+   *  running total to the full pledge amount — it then points at that final installment's
+   *  Donation, same as a one-shot conversion always has. */
   convertedDonationId?: string | null
   /** Set when this pledge was generated from an Auction win (see conversionService's
    *  convertAuctionToExpectedDonation) — the auction winner typically pays the following year,
    *  not immediately, so the auction becomes a pending pledge here rather than an actual Donation. */
   sourceAuctionId?: string | null
+  /** IDs of every actual Donation created against this pledge via recordPartialPayment
+   *  (conversionService.ts) — a pledge can be paid in more than one installment instead of all
+   *  at once. Each installment is still a real, auditable Donation record the moment it's
+   *  received (contributing to the actual closing balance immediately, exactly like a one-shot
+   *  conversion does) rather than a running counter with no underlying transaction trail —
+   *  "amount collected so far" is always `sum of these Donations' amounts`, never stored
+   *  redundantly. Only meaningful for monetary pledges; a commodity donation is never partial
+   *  (you either received the sack of rice or you didn't). Undefined/empty for a pledge that
+   *  was never paid in installments — status still distinguishes 'pending' from 'converted' in
+   *  that case exactly as before this field existed. */
+  installmentDonationIds?: string[]
 }
 
 export interface Expense extends BaseRecord {

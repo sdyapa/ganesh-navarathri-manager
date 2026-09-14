@@ -183,9 +183,11 @@ export const backupDonationSchema = recordBaseSchema
 
 export const backupExpectedDonationSchema = backupDonationSchema
   .extend({
-    status: z.enum(['pending', 'converted']),
+    status: z.enum(['pending', 'partially-paid', 'converted']),
     convertedDonationId: z.string().nullable().optional(),
     sourceAuctionId: z.string().nullable().optional(),
+    // .default([]) so a backup exported before part-payments existed still validates.
+    installmentDonationIds: z.array(z.string()).default([]),
   })
   .passthrough()
 
