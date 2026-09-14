@@ -43,6 +43,14 @@ there side by side with every other year's.
 - **Undo a conversion**: if a donation was converted by mistake, use **Move back to Expected**
   on the Actual Donations list (shown only on records that came from a conversion) — it deletes
   the Actual record and restores the original Expected Donation as pending again.
+- **Part payments**: a pledge doesn't have to be collected all at once. From Expected Donations,
+  use **Record Partial Payment** to log a monetary pledge's installments one at a time — each
+  installment becomes a real Actual Donation immediately (so it's reflected in the balance right
+  away), while the pledge itself shows **Partially Paid** with a running "₹X of ₹Y outstanding"
+  until the full amount has been collected, at which point it automatically becomes
+  **Converted** just like a one-shot conversion. This works identically for pledges created from
+  a won auction (see §2.4) — an auction winner paying in installments the following year is
+  tracked the same way as any other donor's part-paid pledge.
 - **Copy to Expected Donations**: select one or more Actual Donations and copy them into pending
   Expected Donations for next year (or any existing year) — for donors who reliably give the
   same commitment every year; amounts can be adjusted afterward in the target year. The source

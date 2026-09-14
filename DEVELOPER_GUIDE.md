@@ -85,13 +85,14 @@ user has to re-run "Carry Forward Balance" from Settings if they want it updated
 
 | Layer | File(s) |
 |---|---|
-| Types | `Donation`, `ExpectedDonation` in `types/index.ts` |
-| Repository | `db/repositories/donations.ts`, `db/repositories/expectedDonations.ts` |
-| Service | `services/conversionService.ts` — `convertExpectedDonationToDonation` (Expected→Actual), `revertDonationToExpected` (undo) |
+| Types | `Donation`, `ExpectedDonation` in `types/index.ts` — `ExpectedStatus = 'pending' \| 'partially-paid' \| 'converted'` |
+| Repository | `db/repositories/donations.ts` (incl. `sumDonationAmounts`), `db/repositories/expectedDonations.ts` (incl. `updateExpectedDonationPaymentState`) |
+| Service | `services/conversionService.ts` — `convertExpectedDonationToDonation` (Expected→Actual, one shot), `recordPartialPayment` (Expected→Actual, N installments), `revertDonationToExpected` (undo, either path) |
+| Calculation | `lib/calculations.ts` — `computeOutstandingPledgeAmount` |
 | Hook | `hooks/useYearData.ts` → `useDonations`, `useExpectedDonations` |
-| Pages | `pages/donations/DonationsPage.tsx` (Actual), `pages/donations/ExpectedDonationsPage.tsx`, `pages/donations/DonationForm.tsx` (shared by both + the convert flow) |
-| Validation | `donationInputSchema` / `expectedDonationInputSchema` in `lib/validation.ts` |
-| Tests | `describe('expected -> actual conversion')`, `describe('undo a conversion (move back to Expected)')` |
+| Pages | `pages/donations/DonationsPage.tsx` (Actual), `pages/donations/ExpectedDonationsPage.tsx`, `pages/donations/DonationForm.tsx` (shared by both + the convert/partial-payment flows) |
+| Validation | `donationInputSchema` / `expectedDonationInputSchema` in `lib/validation.ts`; `backupExpectedDonationSchema` (`installmentDonationIds`, extended `status` enum) |
+| Tests | `describe('expected -> actual conversion')`, `describe('part payments (installments) for donation/auction pledges')`, `describe('undo a conversion (move back to Expected)')` |
 
 **How conversion actually works** (this shape is intentional, see the comment atop
 `conversionService.ts`): converting never mutates the Expected record into an Actual one in
@@ -101,7 +102,36 @@ place. `convertExpectedDonationToDonation` creates a brand-new `Donation` (via
 `convertedDonationId`. Nothing is ever deleted. **Undo** (`revertDonationToExpected`) is
 therefore just running that relationship backwards: it requires `sourceExpectedDonationId` to be
 set (a plain, never-converted Actual donation has nothing to revert *to*), deletes the Actual
-record, and flips the source back to `status: 'pending'`, `convertedDonationId: null`.
+record, and flips the source back to `status: 'pending'`, `convertedDonationId: null` — or, for
+one installment of a still-partial pledge, back to `status: 'partially-paid'` instead (see below).
+
+**Part payments (`recordPartialPayment`) are `convertExpectedDonationToDonation` generalized to N
+calls instead of exactly 1** — a donor or auction winner paying a pledge in installments rather
+than all at once. Each call: (1) creates a real `Donation` for the installment amount via the
+same `insertDonation` path a one-shot conversion uses (so it's auditable and hits the actual
+balance immediately — see §2.10's "Hard rules"), (2) appends that Donation's id to the pledge's
+`installmentDonationIds` array, (3) sums those installments' actual amounts via
+`sumDonationAmounts` to get the running total collected, and (4) sets `status` to `'converted'`
+(with `convertedDonationId` pointing at the *final* installment — same semantics as a one-shot
+conversion) once that total reaches the full `amount`, or `'partially-paid'` otherwise. A pledge
+never stores a running "amount paid" counter directly — it's always derived from summing the
+installments' own `Donation.amount` fields, so there's no redundant state that could drift out of
+sync with the actual records. Undoing one installment (`revertDonationToExpected`) removes just
+that id from `installmentDonationIds`, dropping the pledge back to `'partially-paid'` if other
+installments remain, or all the way to `'pending'` (with `installmentDonationIds` cleared) if
+that was the only one. This is exactly why `installmentDonationIds` lives on `ExpectedDonation`
+rather than a new parallel entity — it reuses the entire existing convert/undo/audit machinery.
+
+**`computeOutstandingPledgeAmount(pledge, donations)`** (`lib/calculations.ts`) is what makes a
+partially-paid pledge report correctly as "expected" without double-counting: it returns
+`pledge.amount` untouched for a plain pending pledge with no installments yet, or
+`pledge.amount - sum(installment amounts)` (floored at 0) once at least one installment exists.
+`computeFinancialSummary` calls this per pledge instead of a flat `sum(pledges.map(amount))`, and
+widened its pending-pledge filter from `status === 'pending'` to `status !== 'converted'` so a
+`'partially-paid'` pledge doesn't silently drop out of the "Expected" totals the moment its first
+installment lands. `ExpectedDonationsPage.tsx`'s default status filter is similarly `'outstanding'`
+(covers both `'pending'` and `'partially-paid'`), not a strict `'pending'` match, for the same
+reason on the UI side.
 
 ### 2.3 Expenses & Expected Expenses (incl. Move/Undo, Payment Group)
 
